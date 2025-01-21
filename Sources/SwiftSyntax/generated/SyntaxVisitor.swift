@@ -24,9 +24,6 @@ public enum SyntaxVisitorContinueKind {
 open class SyntaxVisitor {
   public let viewMode: SyntaxTreeViewMode
 
-  /// 'Syntax' object factory recycling 'Syntax.Info' instances.
-  private let nodeFactory: SyntaxNodeFactory = SyntaxNodeFactory()
-
   public init(viewMode: SyntaxTreeViewMode) {
     self.viewMode = viewMode
   }
@@ -3337,6 +3334,24 @@ open class SyntaxVisitor {
   open func visitPost(_ node: UnresolvedTernaryExprSyntax) {
   }
 
+  /// Visiting `UnsafeExprSyntax` specifically.
+  ///   - Parameter node: the node we are visiting.
+  ///   - Returns: how should we continue visiting.
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  open func visit(_ node: UnsafeExprSyntax) -> SyntaxVisitorContinueKind {
+    return .visitChildren
+  }
+
+  /// The function called after visiting `UnsafeExprSyntax` and its descendants.
+  ///   - node: the node we just finished visiting.
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  open func visitPost(_ node: UnsafeExprSyntax) {
+  }
+
   /// Visiting ``ValueBindingPatternSyntax`` specifically.
   ///   - Parameter node: the node we are visiting.
   ///   - Returns: how should we continue visiting.
@@ -5677,6 +5692,14 @@ open class SyntaxVisitor {
   }
 
   @inline(never)
+  private func visitUnsafeExprSyntaxImpl(_ node: Syntax) {
+    if visit(UnsafeExprSyntax(unsafeCasting: node)) == .visitChildren {
+      visitChildren(node)
+    }
+    visitPost(UnsafeExprSyntax(unsafeCasting: node))
+  }
+
+  @inline(never)
   private func visitValueBindingPatternSyntaxImpl(_ node: Syntax) {
     if visit(ValueBindingPatternSyntax(unsafeCasting: node)) == .visitChildren {
       visitChildren(node)
@@ -6344,6 +6367,8 @@ open class SyntaxVisitor {
       return self.visitUnresolvedIsExprSyntaxImpl(_:)
     case .unresolvedTernaryExpr:
       return self.visitUnresolvedTernaryExprSyntaxImpl(_:)
+    case .unsafeExpr:
+      return self.visitUnsafeExprSyntaxImpl(_:)
     case .valueBindingPattern:
       return self.visitValueBindingPatternSyntaxImpl(_:)
     case .variableDecl:
@@ -6922,6 +6947,8 @@ open class SyntaxVisitor {
       self.visitUnresolvedIsExprSyntaxImpl(node)
     case .unresolvedTernaryExpr:
       self.visitUnresolvedTernaryExprSyntaxImpl(node)
+    case .unsafeExpr:
+      self.visitUnsafeExprSyntaxImpl(node)
     case .valueBindingPattern:
       self.visitValueBindingPatternSyntaxImpl(node)
     case .variableDecl:
@@ -6951,10 +6978,8 @@ open class SyntaxVisitor {
   #endif
 
   private func visitChildren(_ node: Syntax) {
-    for case let (child?, info) in RawSyntaxChildren(node) where viewMode.shouldTraverse(node: child) {
-      var childNode = nodeFactory.create(parent: node, raw: child, absoluteInfo: info)
-      dispatchVisit(childNode)
-      nodeFactory.dispose(&childNode)
+    for case let childDataRef? in node.layoutBuffer where viewMode.shouldTraverse(node: childDataRef.pointee.raw) {
+      dispatchVisit(Syntax(arena: node.arena, dataRef: childDataRef))
     }
   }
 }
