@@ -1670,9 +1670,11 @@ public struct LayoutRequirementSyntax: SyntaxProtocol, SyntaxHashable, _LeafSynt
 /// 
 ///  - `parameter`: (`<identifier>` | `self` | `<integerLiteral>`)
 ///  - `trailingComma`: `,`?
-#if compiler(>=5.8)
+///
+/// ### Contained in
+/// 
+///  - `LifetimeSpecifierArgumentListSyntax`
 @_spi(ExperimentalLanguageFeatures)
-#endif
 public struct LifetimeSpecifierArgumentSyntax: SyntaxProtocol, SyntaxHashable, _LeafSyntaxNodeProtocol {
   public let _syntaxNode: Syntax
 
@@ -1813,9 +1815,7 @@ public struct LifetimeSpecifierArgumentSyntax: SyntaxProtocol, SyntaxHashable, _
 /// ### Contained in
 /// 
 ///  - ``TypeSpecifierListSyntax``
-#if compiler(>=5.8)
 @_spi(ExperimentalLanguageFeatures)
-#endif
 public struct LifetimeTypeSpecifierSyntax: SyntaxProtocol, SyntaxHashable, _LeafSyntaxNodeProtocol {
   public let _syntaxNode: Syntax
 

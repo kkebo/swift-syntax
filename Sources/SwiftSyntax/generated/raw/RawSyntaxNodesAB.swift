@@ -12,9 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if compiler(>=5.8)
 @_spi(ExperimentalLanguageFeatures)
-#endif
 @_spi(RawSyntax)
 public struct RawABIAttributeArgumentsSyntax: RawSyntaxNodeProtocol {
   public enum Provider: RawSyntaxNodeProtocol {
@@ -2094,6 +2092,89 @@ public struct RawAvailabilityLabeledArgumentSyntax: RawSyntaxNodeProtocol {
   }
 
   public var unexpectedAfterValue: RawUnexpectedNodesSyntax? {
+    layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
+  }
+}
+
+@_spi(Compiler)
+@_spi(RawSyntax)
+public struct RawAvailabilityMacroDefinitionSyntax: RawSyntaxNodeProtocol {
+  @_spi(RawSyntax)
+  public var layoutView: RawSyntaxLayoutView {
+    return raw.layoutView!
+  }
+
+  public static func isKindOf(_ raw: RawSyntax) -> Bool {
+    return raw.kind == .availabilityMacroDefinition
+  }
+
+  public var raw: RawSyntax
+
+  init(raw: RawSyntax) {
+    precondition(Self.isKindOf(raw))
+    self.raw = raw
+  }
+
+  private init(unchecked raw: RawSyntax) {
+    self.raw = raw
+  }
+
+  public init?(_ other: some RawSyntaxNodeProtocol) {
+    guard Self.isKindOf(other.raw) else {
+      return nil
+    }
+    self.init(unchecked: other.raw)
+  }
+
+  public init(
+    _ unexpectedBeforePlatformVersion: RawUnexpectedNodesSyntax? = nil,
+    platformVersion: RawPlatformVersionSyntax,
+    _ unexpectedBetweenPlatformVersionAndColon: RawUnexpectedNodesSyntax? = nil,
+    colon: RawTokenSyntax,
+    _ unexpectedBetweenColonAndSpecs: RawUnexpectedNodesSyntax? = nil,
+    specs: RawAvailabilityArgumentListSyntax,
+    _ unexpectedAfterSpecs: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
+    let raw = RawSyntax.makeLayout(
+      kind: .availabilityMacroDefinition, uninitializedCount: 7, arena: arena) { layout in
+      layout.initialize(repeating: nil)
+      layout[0] = unexpectedBeforePlatformVersion?.raw
+      layout[1] = platformVersion.raw
+      layout[2] = unexpectedBetweenPlatformVersionAndColon?.raw
+      layout[3] = colon.raw
+      layout[4] = unexpectedBetweenColonAndSpecs?.raw
+      layout[5] = specs.raw
+      layout[6] = unexpectedAfterSpecs?.raw
+    }
+    self.init(unchecked: raw)
+  }
+
+  public var unexpectedBeforePlatformVersion: RawUnexpectedNodesSyntax? {
+    layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
+  }
+
+  public var platformVersion: RawPlatformVersionSyntax {
+    layoutView.children[1].map(RawPlatformVersionSyntax.init(raw:))!
+  }
+
+  public var unexpectedBetweenPlatformVersionAndColon: RawUnexpectedNodesSyntax? {
+    layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
+  }
+
+  public var colon: RawTokenSyntax {
+    layoutView.children[3].map(RawTokenSyntax.init(raw:))!
+  }
+
+  public var unexpectedBetweenColonAndSpecs: RawUnexpectedNodesSyntax? {
+    layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
+  }
+
+  public var specs: RawAvailabilityArgumentListSyntax {
+    layoutView.children[5].map(RawAvailabilityArgumentListSyntax.init(raw:))!
+  }
+
+  public var unexpectedAfterSpecs: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
 }

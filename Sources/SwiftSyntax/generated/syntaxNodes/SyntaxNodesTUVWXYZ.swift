@@ -240,9 +240,7 @@ public struct TernaryExprSyntax: ExprSyntaxProtocol, SyntaxHashable, _LeafExprSy
 /// 
 ///  - `thenKeyword`: `then`
 ///  - `expression`: ``ExprSyntax``
-#if compiler(>=5.8)
 @_spi(ExperimentalLanguageFeatures)
-#endif
 public struct ThenStmtSyntax: StmtSyntaxProtocol, SyntaxHashable, _LeafStmtSyntaxNodeProtocol {
   public let _syntaxNode: Syntax
 
@@ -3280,9 +3278,7 @@ public struct UnresolvedTernaryExprSyntax: ExprSyntaxProtocol, SyntaxHashable, _
 /// 
 ///  - `unsafeKeyword`: `unsafe`
 ///  - `expression`: ``ExprSyntax``
-#if compiler(>=5.8)
 @_spi(ExperimentalLanguageFeatures)
-#endif
 public struct UnsafeExprSyntax: ExprSyntaxProtocol, SyntaxHashable, _LeafExprSyntaxNodeProtocol {
   public let _syntaxNode: Syntax
 
@@ -3942,7 +3938,6 @@ public struct VersionComponentSyntax: SyntaxProtocol, SyntaxHashable, _LeafSynta
 /// ### Contained in
 /// 
 ///  - ``AvailabilityLabeledArgumentSyntax``.``AvailabilityLabeledArgumentSyntax/value``
-///  - `_CanImportVersionInfoSyntax`.`_CanImportVersionInfoSyntax/version`
 ///  - ``PlatformVersionSyntax``.``PlatformVersionSyntax/version``
 public struct VersionTupleSyntax: SyntaxProtocol, SyntaxHashable, _LeafSyntaxNodeProtocol {
   public let _syntaxNode: Syntax

@@ -101,9 +101,7 @@ open class SyntaxRewriter {
   /// Visit a `ABIAttributeArgumentsSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: ABIAttributeArgumentsSyntax) -> ABIAttributeArgumentsSyntax {
     return ABIAttributeArgumentsSyntax(unsafeCasting: visitChildren(node._syntaxNode))
   }
@@ -253,6 +251,14 @@ open class SyntaxRewriter {
   ///   - Returns: the rewritten node
   open func visit(_ node: AvailabilityLabeledArgumentSyntax) -> AvailabilityLabeledArgumentSyntax {
     return AvailabilityLabeledArgumentSyntax(unsafeCasting: visitChildren(node._syntaxNode))
+  }
+
+  /// Visit a ``AvailabilityMacroDefinitionSyntax``.
+  ///   - Parameter node: the node that is being visited
+  ///   - Returns: the rewritten node
+  @_spi(Compiler)
+  open func visit(_ node: AvailabilityMacroDefinitionSyntax) -> AvailabilityMacroDefinitionSyntax {
+    return AvailabilityMacroDefinitionSyntax(unsafeCasting: visitChildren(node._syntaxNode))
   }
 
   /// Visit a ``AwaitExprSyntax``.
@@ -699,9 +705,7 @@ open class SyntaxRewriter {
   /// Visit a `DoExprSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: DoExprSyntax) -> ExprSyntax {
     return ExprSyntax(DoExprSyntax(unsafeCasting: visitChildren(node._syntaxNode)))
   }
@@ -1234,9 +1238,7 @@ open class SyntaxRewriter {
   /// Visit a `LifetimeSpecifierArgumentListSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: LifetimeSpecifierArgumentListSyntax) -> LifetimeSpecifierArgumentListSyntax {
     return LifetimeSpecifierArgumentListSyntax(unsafeCasting: visitChildren(node._syntaxNode))
   }
@@ -1244,9 +1246,7 @@ open class SyntaxRewriter {
   /// Visit a `LifetimeSpecifierArgumentSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: LifetimeSpecifierArgumentSyntax) -> LifetimeSpecifierArgumentSyntax {
     return LifetimeSpecifierArgumentSyntax(unsafeCasting: visitChildren(node._syntaxNode))
   }
@@ -1254,9 +1254,7 @@ open class SyntaxRewriter {
   /// Visit a `LifetimeTypeSpecifierSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: LifetimeTypeSpecifierSyntax) -> LifetimeTypeSpecifierSyntax {
     return LifetimeTypeSpecifierSyntax(unsafeCasting: visitChildren(node._syntaxNode))
   }
@@ -1859,9 +1857,7 @@ open class SyntaxRewriter {
   /// Visit a `ThenStmtSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: ThenStmtSyntax) -> StmtSyntax {
     return StmtSyntax(ThenStmtSyntax(unsafeCasting: visitChildren(node._syntaxNode)))
   }
@@ -2023,9 +2019,7 @@ open class SyntaxRewriter {
   /// Visit a `UnsafeExprSyntax`.
   ///   - Parameter node: the node that is being visited
   ///   - Returns: the rewritten node
-  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
-  #endif
   open func visit(_ node: UnsafeExprSyntax) -> ExprSyntax {
     return ExprSyntax(UnsafeExprSyntax(unsafeCasting: visitChildren(node._syntaxNode)))
   }
@@ -2262,6 +2256,11 @@ open class SyntaxRewriter {
   @inline(never)
   private func visitAvailabilityLabeledArgumentSyntaxImpl(_ node: Syntax) -> Syntax {
     Syntax(visit(AvailabilityLabeledArgumentSyntax(unsafeCasting: node)))
+  }
+
+  @inline(never)
+  private func visitAvailabilityMacroDefinitionSyntaxImpl(_ node: Syntax) -> Syntax {
+    Syntax(visit(AvailabilityMacroDefinitionSyntax(unsafeCasting: node)))
   }
 
   @inline(never)
@@ -3651,6 +3650,8 @@ open class SyntaxRewriter {
       return self.visitAvailabilityConditionSyntaxImpl(_:)
     case .availabilityLabeledArgument:
       return self.visitAvailabilityLabeledArgumentSyntaxImpl(_:)
+    case .availabilityMacroDefinition:
+      return self.visitAvailabilityMacroDefinitionSyntaxImpl(_:)
     case .awaitExpr:
       return self.visitAwaitExprSyntaxImpl(_:)
     case .backDeployedAttributeArguments:
@@ -4231,6 +4232,8 @@ open class SyntaxRewriter {
       return visitAvailabilityConditionSyntaxImpl(node)
     case .availabilityLabeledArgument:
       return visitAvailabilityLabeledArgumentSyntaxImpl(node)
+    case .availabilityMacroDefinition:
+      return visitAvailabilityMacroDefinitionSyntaxImpl(node)
     case .awaitExpr:
       return visitAwaitExprSyntaxImpl(node)
     case .backDeployedAttributeArguments:
