@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !os(WASI)
-import Dispatch
-#endif
 import SwiftParser
 import SwiftParserDiagnostics
 import SwiftSyntax
 import XCTest
 import _SwiftSyntaxTestSupport
+
+#if !os(WASI)
+import Dispatch
+#endif
 
 class ParserTests: ParserTestCase {
   /// Run a single parse test.
@@ -73,7 +74,7 @@ class ParserTests: ParserTestCase {
       }
 
     print("\(name) - processing \(fileURLs.count) source files")
-#if !os(WASI)
+    #if !os(WASI)
     DispatchQueue.concurrentPerform(iterations: fileURLs.count) { fileURLIndex in
       let fileURL = fileURLs[fileURLIndex]
       if shouldExclude(fileURL) {
@@ -86,7 +87,7 @@ class ParserTests: ParserTestCase {
         XCTFail("\(name): \(fileURL) failed due to \(error)")
       }
     }
-#else
+    #else
     for fileURL in fileURLs where !shouldExclude(fileURL) {
       do {
         try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
@@ -94,7 +95,7 @@ class ParserTests: ParserTestCase {
         XCTFail("\(name): \(fileURL) failed due to \(error)")
       }
     }
-#endif
+    #endif
   }
 
   let packageDir = URL(fileURLWithPath: #filePath)
