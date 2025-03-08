@@ -804,8 +804,18 @@ extension ParserTestCase {
       #else
       for index in 0..<mutations.count {
         let mutation = mutations[index]
-        let alternateSource = MutatedTreePrinter.print(tree: Syntax(tree), mutations: [mutation.offset: mutation.replacement])
-        assertMutationRoundTrip(source: alternateSource, parse, swiftVersion: swiftVersion, experimentalFeatures: experimentalFeatures, file: file, line: line)
+        let alternateSource = MutatedTreePrinter.print(
+          tree: Syntax(tree),
+          mutations: [mutation.offset: mutation.replacement]
+        )
+        assertMutationRoundTrip(
+          source: alternateSource,
+          parse,
+          swiftVersion: swiftVersion,
+          experimentalFeatures: experimentalFeatures,
+          file: file,
+          line: line
+        )
       }
       #endif
       #endif
