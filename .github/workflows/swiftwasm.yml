@@ -11,11 +11,13 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: swiftlang/swift:nightly-main-jammy@sha256:a33290fe92a72f24e626d30166616a39ceb841858922386229d8c2aa48741ec1
+    container: swiftlang/swift:nightly-main-noble@sha256:2f44d88f735d73e84073ffc354f745a7f40067f97e8b7ac16f39377da5321bbf
     env:
       STACK_SIZE: 16777216
     steps:
       - uses: actions/checkout@v4
+      - name: Install tools
+        run: apt-get update && apt-get install --no-install-recommends -y xz-utils
       - uses: bytecodealliance/actions/wasmtime/setup@v1
         with:
           version: "31.0.0"
