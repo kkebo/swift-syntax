@@ -29,7 +29,7 @@ jobs:
         run: apt-get update && apt-get install --no-install-recommends -y xz-utils unzip
       - uses: bytecodealliance/actions/wasmtime/setup@v1
         with:
-          version: "31.0.0"
+          version: "32.0.0"
       - run: swift --version
       - run: wasmtime -V
       - run: swift sdk install ${{ matrix.target.sdk.url }} --checksum ${{ matrix.target.sdk.checksum }}
