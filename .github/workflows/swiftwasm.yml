@@ -13,12 +13,12 @@ jobs:
             sdk:
               url: https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-04-12-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-04-12-a-wasm32-unknown-wasi.artifactbundle.zip
               checksum: 4b8f1e8346003cf2c3dd5b545a24c54a80d8492a7c719a50500f6056a99cc9d4
-            other_wasmtime_flags:
+            other-wasmtime-flags:
           - triple: wasm32-unknown-wasip1-threads
             sdk:
               url: https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-04-12-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-04-12-a-wasm32-unknown-wasip1-threads.artifactbundle.zip
               checksum: 9f756a771ba9433e6f78e476b1c8cb2b55abce0d0d1d755d8be57f0685f4dae2
-            other_wasmtime_flags: --wasi threads
+            other-wasmtime-flags: --wasi threads
     runs-on: ubuntu-24.04-arm
     container: swiftlang/swift:nightly-main-noble@sha256:d9a25c3c670dfb1209c969e236b4e48580a04ca63a920a92f3ac03580a33b9e1
     env:
@@ -34,4 +34,4 @@ jobs:
       - run: wasmtime -V
       - run: swift sdk install ${{ matrix.target.sdk.url }} --checksum ${{ matrix.target.sdk.checksum }}
       - run: swift build -c release --build-tests --swift-sdk ${{ matrix.target.triple }} -Xlinker -z -Xlinker stack-size=$STACK_SIZE
-      - run: wasmtime --dir / --wasm max-wasm-stack=$STACK_SIZE ${{ matrix.target.other_wasmtime_flags }} .build/release/swift-syntaxPackageTests.xctest
+      - run: wasmtime --dir / --wasm max-wasm-stack=$STACK_SIZE ${{ matrix.target.other-wasmtime-flags }} .build/release/swift-syntaxPackageTests.xctest
