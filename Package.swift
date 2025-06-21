@@ -62,6 +62,10 @@ let package = Package(
     ),
 
     .target(
+      name: "_SwiftSyntaxSwiftShims"
+    ),
+
+    .target(
       name: "_InstructionCounter"
     ),
 
@@ -125,7 +129,7 @@ let package = Package(
     .target(
       name: "SwiftCompilerPluginMessageHandling",
       dependencies: [
-        "_SwiftSyntaxCShims",
+        "_SwiftSyntaxSwiftShims",
         "SwiftDiagnostics",
         "SwiftOperators",
         "SwiftParser",
@@ -211,7 +215,7 @@ let package = Package(
     .target(
       name: "SwiftSyntax",
       dependencies: [
-        "_SwiftSyntaxCShims", "SwiftSyntax509", "SwiftSyntax510", "SwiftSyntax600", "SwiftSyntax601", "SwiftSyntax602",
+        "_SwiftSyntaxSwiftShims", "SwiftSyntax509", "SwiftSyntax510", "SwiftSyntax600", "SwiftSyntax601", "SwiftSyntax602",
         "SwiftSyntax603",
       ],
       exclude: ["CMakeLists.txt"],

@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #if compiler(>=6) && RESILIENT_LIBRARIES
-@_implementationOnly private import _SwiftSyntaxCShims
+@_implementationOnly private import _SwiftSyntaxSwiftShims
 #elseif compiler(>=6) && !RESILIENT_LIBRARIES
-private import _SwiftSyntaxCShims
+private import _SwiftSyntaxSwiftShims
 #elseif !compiler(>=6) && RESILIENT_LIBRARIES
-@_implementationOnly import _SwiftSyntaxCShims
+@_implementationOnly import _SwiftSyntaxSwiftShims
 #elseif !compiler(>=6) && !RESILIENT_LIBRARIES
-import _SwiftSyntaxCShims
+import _SwiftSyntaxSwiftShims
 #endif
 
 #if canImport(ucrt)
