@@ -20,13 +20,15 @@ jobs:
               checksum: 9d273f7b5e26bffa284a386833bb1675a04c7e177f67c58725fea41c1bc63f5a
             other-wasmtime-flags: --wasi threads
     runs-on: ubuntu-24.04-arm
-    container: swiftlang/swift:nightly-main-noble@sha256:431010bdc206a7bc0c2556f9b09200a0d876f504fe4e05b357147767581cc8d8
     env:
       STACK_SIZE: 16777216
     steps:
       - uses: actions/checkout@v4
-      - name: Install tools
-        run: apt-get update && apt-get install --no-install-recommends -y xz-utils unzip
+      - run: ./Scripts/ci-install-swiftly.sh
+      - name: swiftly install
+        run: |
+          curl --silent --retry 3 --location --fail --compressed https://swift.org/keys/all-keys.asc | gpg --import -
+          swiftly install -y --use main-snapshot-2025-07-18
       - uses: bytecodealliance/actions/wasmtime/setup@v1
         with:
           version: "35.0.0"
