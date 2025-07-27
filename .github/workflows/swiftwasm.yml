@@ -10,9 +10,9 @@ jobs:
       matrix:
         target:
           - sdk:
-              url: https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-07-24-a/swift-DEVELOPMENT-SNAPSHOT-2025-07-24-a_wasm.artifactbundle.tar.gz
-              checksum: 7b91fbf436e56f3e2357577483a4637c092e5f326812d9eae05855254da66062
-              id: swift-DEVELOPMENT-SNAPSHOT-2025-07-24-a_wasm
+              url: https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-07-26-a/swift-DEVELOPMENT-SNAPSHOT-2025-07-26-a_wasm.artifactbundle.tar.gz
+              checksum: 8a569d5403dde41508b61a913507e33dd3d0f23ca3d2c173220edf1a21734da5
+              id: swift-DEVELOPMENT-SNAPSHOT-2025-07-26-a_wasm
             other-wasmkit-flags:
     runs-on: ubuntu-24.04-arm
     env:
@@ -23,7 +23,7 @@ jobs:
       - name: swiftly install
         run: |
           curl --silent --retry 3 --location --fail --compressed https://swift.org/keys/all-keys.asc | gpg --import -
-          swiftly install -y --use main-snapshot-2025-07-24
+          swiftly install -y --use main-snapshot-2025-07-26
       - run: swift --version
       - run: swift sdk install ${{ matrix.target.sdk.url }} --checksum ${{ matrix.target.sdk.checksum }}
       - run: swift build -c release --build-tests --swift-sdk ${{ matrix.target.sdk.id }} -Xlinker -z -Xlinker stack-size=$STACK_SIZE
