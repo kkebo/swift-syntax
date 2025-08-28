@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !os(WASI)
+
 #if compiler(>=6)
 public import SwiftSyntaxMacros
 @_spi(PluginMessage) public import SwiftCompilerPluginMessageHandling
@@ -223,3 +225,5 @@ extension UnsafeMutableBufferPointer {
   }
 }
 #endif
+
+#endif  // !os(WASI)
