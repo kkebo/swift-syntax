@@ -18,7 +18,7 @@ jobs:
     env:
       STACK_SIZE: 16777216
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
       - run: ./Scripts/ci-install-swiftly.sh
       - run: swiftly install -y --use main-snapshot-2025-09-29
       - run: swift --version
