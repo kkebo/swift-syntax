@@ -4,6 +4,7 @@ on:
     branches: ["wasm32-wasi-test"]
   pull_request:
     branches: ["wasm32-wasi-test"]
+permissions: {}
 jobs:
   test:
     strategy:
@@ -17,6 +18,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     env:
       STACK_SIZE: 16777216
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
       - run: ./Scripts/ci-install-swiftly.sh
