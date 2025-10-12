@@ -1,0 +1,15 @@
+{
+    "schemaVersion": "1.0",
+    "linker": {
+        "extraCLIOptions": [
+            "-z", "stack-size=16777216"
+        ]
+    },
+    "testRunner": {
+        "extraCLIOptions": [
+            "--dir", ".build",
+            "--dir", "/",
+            "--stack-size", "16777216"
+        ]
+    }
+}
