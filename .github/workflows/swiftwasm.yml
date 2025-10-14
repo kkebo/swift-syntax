@@ -14,7 +14,10 @@ jobs:
               url: https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz
               checksum: b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9
               id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            other-wasmkit-flags:
     runs-on: ubuntu-24.04-arm
+    env:
+      STACK_SIZE: 16777216
     permissions:
       contents: read
     steps:
@@ -23,7 +26,8 @@ jobs:
       - run: swiftly install -y --use main-snapshot-2025-10-02
       - run: swift --version
       - run: swift sdk install ${{ matrix.target.sdk.url }} --checksum ${{ matrix.target.sdk.checksum }}
-      - run: swift test -c release --swift-sdk ${{ matrix.target.sdk.id }} --toolset wasi-test-toolset.json --no-parallel
+      - run: swift build -c release --build-tests --swift-sdk ${{ matrix.target.sdk.id }} -Xlinker -z -Xlinker stack-size=$STACK_SIZE
+      - run: wasmkit run --dir .build --dir / --stack-size=$STACK_SIZE ${{ matrix.target.other-wasmkit-flags }} .build/release/swift-syntaxPackageTests.xctest
   results:
     if: ${{ always() }}
     runs-on: ubuntu-24.04-arm
