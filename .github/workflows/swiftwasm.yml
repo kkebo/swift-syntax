@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: ["wasm32-wasi-test"]
 permissions: {}
+defaults:
+  run: bash -euo pipefail
 jobs:
   test:
     strategy:
