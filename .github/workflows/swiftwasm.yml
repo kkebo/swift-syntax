@@ -5,6 +5,9 @@ on:
   pull_request:
     branches: ["wasm32-wasi-test"]
 permissions: {}
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
 jobs:
   test:
     strategy:
@@ -25,9 +28,16 @@ jobs:
       - run: ./Scripts/ci-install-swiftly.sh
       - run: swiftly install -y --use main-snapshot-2025-10-02
       - run: swift --version
-      - run: swift sdk install ${{ matrix.target.sdk.url }} --checksum ${{ matrix.target.sdk.checksum }}
-      - run: swift build -c release --build-tests --swift-sdk ${{ matrix.target.sdk.id }} -Xlinker -z -Xlinker stack-size=$STACK_SIZE
-      - run: wasmkit run --dir .build --dir / --stack-size=$STACK_SIZE ${{ matrix.target.other-wasmkit-flags }} .build/release/swift-syntaxPackageTests.xctest
+      - env:
+          SDK_URL: ${{ matrix.target.sdk.url }}
+          SDK_CHECKSUM: ${{ matrix.target.sdk.checksum }}
+        run: swift sdk install "$SDK_URL" --checksum "$SDK_CHECKSUM"
+      - env:
+          SDK_ID: ${{ matrix.target.sdk.id }}
+        run: swift build -c release --build-tests --swift-sdk "$SDK_ID" -Xlinker -z -Xlinker stack-size="$STACK_SIZE"
+      - env:
+          WASMKIT_FLAGS: ${{ matrix.target.other-wasmkit-flags }}
+        run: wasmkit run --dir .build --dir / --stack-size="$STACK_SIZE" $WASMKIT_FLAGS .build/release/swift-syntaxPackageTests.xctest
   results:
     if: ${{ always() }}
     runs-on: ubuntu-24.04-arm
