@@ -6,7 +6,8 @@ on:
     branches: ["wasm32-wasi-test"]
 permissions: {}
 defaults:
-  run: bash -euo pipefail
+  run:
+    shell: bash -euo pipefail
 jobs:
   test:
     strategy:
