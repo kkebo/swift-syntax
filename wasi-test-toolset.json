@@ -6,7 +6,11 @@
         ]
     },
     "testRunner": {
+        "path": "/usr/bin/env",
         "extraCLIOptions": [
+            "wasmkit",
+            "run",
+            "--dir", ".build",
             "--dir", "/",
             "--stack-size", "16777216"
         ]
