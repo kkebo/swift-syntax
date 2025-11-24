@@ -59,7 +59,7 @@ class ParserTests: ParserTestCase {
     path: URL,
     checkDiagnostics: Bool,
     shouldExclude: @escaping @Sendable (URL) -> Bool = { _ in false }
-  ) async {
+  ) async throws {
     let fileURLs = FileManager.default
       .enumerator(at: path, includingPropertiesForKeys: nil)!
       .compactMap({ $0 as? URL })
@@ -70,14 +70,10 @@ class ParserTests: ParserTestCase {
       }
 
     print("\(name) - processing \(fileURLs.count) source files")
-    await withDiscardingTaskGroup { group in
+    try await withThrowingDiscardingTaskGroup { group in
       for fileURL in fileURLs where !shouldExclude(fileURL) {
         group.addTask {
-          do {
-            try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
-          } catch {
-            XCTFail("\(name): \(fileURL) failed due to \(error)")
-          }
+          try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
         }
       }
     }
@@ -95,7 +91,7 @@ class ParserTests: ParserTestCase {
     let currentDir =
       packageDir
       .appendingPathComponent("Sources")
-    await runParserTests(
+    try await runParserTests(
       name: "Self-parse tests",
       path: currentDir,
       checkDiagnostics: true
@@ -112,7 +108,7 @@ class ParserTests: ParserTestCase {
       .deletingLastPathComponent()
       .appendingPathComponent("swift")
       .appendingPathComponent("test")
-    await runParserTests(
+    try await runParserTests(
       name: "Swift tests",
       path: testDir,
       checkDiagnostics: false
@@ -129,7 +125,7 @@ class ParserTests: ParserTestCase {
       .deletingLastPathComponent()
       .appendingPathComponent("swift")
       .appendingPathComponent("validation-test")
-    await runParserTests(
+    try await runParserTests(
       name: "Swift validation tests",
       path: testDir,
       checkDiagnostics: false
