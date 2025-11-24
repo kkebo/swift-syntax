@@ -16,10 +16,6 @@ import SwiftSyntax
 import XCTest
 import _SwiftSyntaxTestSupport
 
-#if !os(WASI)
-import Dispatch
-#endif
-
 class ParserTests: ParserTestCase {
   /// Run a single parse test.
   static func runParseTest(fileURL: URL, checkDiagnostics: Bool) throws {
@@ -62,8 +58,8 @@ class ParserTests: ParserTestCase {
     name: String,
     path: URL,
     checkDiagnostics: Bool,
-    shouldExclude: @Sendable (URL) -> Bool = { _ in false }
-  ) {
+    shouldExclude: @escaping @Sendable (URL) -> Bool = { _ in false }
+  ) async throws {
     let fileURLs = FileManager.default
       .enumerator(at: path, includingPropertiesForKeys: nil)!
       .compactMap({ $0 as? URL })
@@ -74,28 +70,13 @@ class ParserTests: ParserTestCase {
       }
 
     print("\(name) - processing \(fileURLs.count) source files")
-    #if !os(WASI)
-    DispatchQueue.concurrentPerform(iterations: fileURLs.count) { fileURLIndex in
-      let fileURL = fileURLs[fileURLIndex]
-      if shouldExclude(fileURL) {
-        return
-      }
-
-      do {
-        try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
-      } catch {
-        XCTFail("\(name): \(fileURL) failed due to \(error)")
+    try await withThrowingTaskGroup(of: Void.self) { group in
+      for fileURL in fileURLs where !shouldExclude(fileURL) {
+        group.addTask {
+          try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
+        }
       }
     }
-    #else
-    for fileURL in fileURLs where !shouldExclude(fileURL) {
-      do {
-        try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
-      } catch {
-        XCTFail("\(name): \(fileURL) failed due to \(error)")
-      }
-    }
-    #endif
   }
 
   let packageDir = URL(fileURLWithPath: #filePath)
@@ -103,14 +84,14 @@ class ParserTests: ParserTestCase {
     .deletingLastPathComponent()
     .deletingLastPathComponent()
 
-  func testSelfParse() throws {
+  func testSelfParse() async throws {
     // Allow skipping the self parse test in local development environments
     // because it takes very long compared to all the other tests.
     try XCTSkipIf(longTestsDisabled)
     let currentDir =
       packageDir
       .appendingPathComponent("Sources")
-    runParserTests(
+    try await runParserTests(
       name: "Self-parse tests",
       path: currentDir,
       checkDiagnostics: true
@@ -120,14 +101,14 @@ class ParserTests: ParserTestCase {
   /// Test all of the files in the "test" directory of the main Swift compiler.
   /// This requires the Swift compiler to have been checked out into the "swift"
   /// directory alongside swift-syntax.
-  func testSwiftTestsuite() throws {
+  func testSwiftTestsuite() async throws {
     try XCTSkipIf(longTestsDisabled)
     let testDir =
       packageDir
       .deletingLastPathComponent()
       .appendingPathComponent("swift")
       .appendingPathComponent("test")
-    runParserTests(
+    try await runParserTests(
       name: "Swift tests",
       path: testDir,
       checkDiagnostics: false
@@ -137,14 +118,14 @@ class ParserTests: ParserTestCase {
   /// Test all of the files in the "validation-text" directory of the main
   /// Swift compiler. This requires the Swift compiler to have been checked
   /// out into the "swift" directory alongside swift-syntax.
-  func testSwiftValidationTestsuite() throws {
+  func testSwiftValidationTestsuite() async throws {
     try XCTSkipIf(longTestsDisabled)
     let testDir =
       packageDir
       .deletingLastPathComponent()
       .appendingPathComponent("swift")
       .appendingPathComponent("validation-test")
-    runParserTests(
+    try await runParserTests(
       name: "Swift validation tests",
       path: testDir,
       checkDiagnostics: false
