@@ -30,7 +30,7 @@ class MultithreadingTests: XCTestCase, @unchecked Sendable {
       rightParen: .rightParenToken()
     )
 
-    await withDiscardingTaskGroup { group in
+    await withTaskGroup(of: Void.self) { group in
       for _ in 0..<100 {
         group.addTask {
           XCTAssertEqual(tuple.leftParen, tuple.leftParen)
@@ -54,7 +54,7 @@ class MultithreadingTests: XCTestCase, @unchecked Sendable {
       rightParen: .rightParenToken()
     )
 
-    await withDiscardingTaskGroup { group in
+    await withTaskGroup(of: Void.self) { group in
       for i in 0..<100 {
         group.addTask {
           var copied = methodCall

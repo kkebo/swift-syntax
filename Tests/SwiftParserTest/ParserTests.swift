@@ -70,7 +70,7 @@ class ParserTests: ParserTestCase {
       }
 
     print("\(name) - processing \(fileURLs.count) source files")
-    try await withThrowingDiscardingTaskGroup { group in
+    try await withThrowingTaskGroup(of: Void.self) { group in
       for fileURL in fileURLs where !shouldExclude(fileURL) {
         group.addTask {
           try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
