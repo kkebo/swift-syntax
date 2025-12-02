@@ -14,16 +14,16 @@ jobs:
       matrix:
         target:
           - sdk:
-              url: https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-11-26-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-26-a_wasm.artifactbundle.tar.gz
-              checksum: 066087e242e3e246d3cd319b45d8b9dbd731a1eaf147db1d6680bbb16878584d
-              id: swift-DEVELOPMENT-SNAPSHOT-2025-11-26-a_wasm
+              url: https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a_wasm.artifactbundle.tar.gz
+              checksum: 40faaf0253ead35d00716338cb7aad7498462d0600b4fefd8613195521927bdf
+              id: swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a_wasm
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
       - run: ./Scripts/ci-install-swiftly.sh
-      - run: swiftly install -y --use main-snapshot-2025-11-26
+      - run: swiftly install -y --use main-snapshot-2025-12-01
       - run: swift --version
       - env:
           SDK_URL: ${{ matrix.target.sdk.url }}
