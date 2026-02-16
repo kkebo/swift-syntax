@@ -211,6 +211,14 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
     try assertParenRemoval("(try? f()) + g() + h()", expected: "(try? f()) + g() + h()")
     try assertParenRemoval("(await f()) + g()", expected: "(await f()) + g()")
   }
+
+  func testParenthesesInRepeatWhileBody() throws {
+    try assertParenRemoval(
+      "repeat { (x) } while true",
+      expected: "repeat { x } while true"
+    )
+  }
+
 }
 
 // MARK: - Test Helper
@@ -248,6 +256,10 @@ private class ParenRemovalRewriter: SyntaxRewriter {
       return visited
     }
     // Then apply the refactoring
-    return RemoveRedundantParentheses.refactor(syntax: tuple, in: ())
+    do {
+      return try RemoveRedundantParentheses.refactor(syntax: tuple, in: ())
+    } catch {
+      return ExprSyntax(tuple)  // Return unchanged if refactoring not applicable
+    }
   }
 }

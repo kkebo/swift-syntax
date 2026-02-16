@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #if compiler(>=6)
-@_spi(RawSyntax) public import SwiftSyntax
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) public import SwiftSyntax
 #else
-@_spi(RawSyntax) import SwiftSyntax
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 #endif
 
 /// Removes redundant parentheses from expressions.
@@ -26,30 +26,37 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
   public static func refactor(
     syntax: TupleExprSyntax,
     in context: Void
-  ) -> ExprSyntax {
+  ) throws -> ExprSyntax {
     // If the syntax tree has errors, we should not attempt to refactor it.
     guard !syntax.hasError else {
-      return ExprSyntax(syntax)
+      throw RefactoringNotApplicableError("syntax has errors")
     }
 
     // Check if the tuple expression has exactly one element and no label.
     guard let innerExpr = syntax.elements.singleUnlabeledExpression else {
-      return ExprSyntax(syntax)
+      throw RefactoringNotApplicableError("not a parenthesized expression")
     }
 
     // Case 1: Nested parentheses ((expression)) -> (expression)
     // Recursively strip inner parentheses to handle cases like (((x))) -> x
     if let innerTuple = innerExpr.as(TupleExprSyntax.self) {
-      return preserveTrivia(from: syntax, to: refactor(syntax: innerTuple, in: ()))
+      do {
+        let refactoredInner = try refactor(syntax: innerTuple, in: ())
+        return preserveTrivia(from: syntax, to: refactoredInner)
+      } catch {
+        // Inner refactoring not applicable (e.g., inner is a multi-element tuple like (x, y)),
+        // but we can still remove the outer parentheses around the inner tuple.
+        return preserveTrivia(from: syntax, to: innerExpr)
+      }
     }
 
     // Case 2: Parentheses around simple expressions
-    if canRemoveParentheses(tuple: syntax, around: innerExpr, in: syntax.parent) {
+    if canRemoveParentheses(tuple: syntax, around: innerExpr) {
       return preserveTrivia(from: syntax, to: innerExpr)
     }
 
-    // Default: Return unchanged
-    return ExprSyntax(syntax)
+    // Default: Parentheses are not redundant
+    throw RefactoringNotApplicableError("parentheses are not redundant")
   }
 
   private static func preserveTrivia(from outer: TupleExprSyntax, to inner: ExprSyntax) -> ExprSyntax {
@@ -65,19 +72,23 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
       .with(\.trailingTrivia, trailingTrivia)
   }
 
-  private static func canRemoveParentheses(tuple: TupleExprSyntax, around expr: ExprSyntax, in parent: Syntax?) -> Bool
-  {
+  private static func canRemoveParentheses(tuple: TupleExprSyntax, around expr: ExprSyntax) -> Bool {
     // Safety Check: Ambiguous Closures
     // Closures and trailing closures inside conditions need parentheses to avoid ambiguity.
     // e.g. `if ({ true }) == ({ true }) {}` or `if (call { true }) == false {}`
     // This applies to if/while/guard (ConditionElementSyntax) and repeat-while (RepeatStmtSyntax).
     // It also applies to InitializerClauseSyntax if it is inside a condition (e.g. `if let x = ({...})`).
+    let keyPath = tuple.keyPathInParent
     let isInCondition =
-      parent?.ancestorOrSelf(mapping: {
-        if $0.is(ConditionElementSyntax.self) || $0.is(RepeatStmtSyntax.self) {
+      keyPath == \ConditionElementSyntax.condition
+      || keyPath == \RepeatStmtSyntax.condition
+      || tuple.parent?.ancestorOrSelf(mapping: {
+        switch $0.keyPathInParent {
+        case \ConditionElementSyntax.condition, \RepeatStmtSyntax.condition:
           return $0
+        default:
+          return nil
         }
-        return nil
       }) != nil
 
     if isInCondition && (expr.is(ClosureExprSyntax.self) || hasTrailingClosure(expr)) {
@@ -85,8 +96,9 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     }
 
     // Safety Check: Immediately-invoked closures
-    if let functionCall = parent?.as(FunctionCallExprSyntax.self),
-      functionCall.calledExpression.as(TupleExprSyntax.self) != nil,
+    // If parent is a FunctionCallExprSyntax and inner expr is a closure, it's an IIFE.
+    // The parentheses are required for disambiguation: `let x = ({ 1 })()` not `let x = { 1 }()`.
+    if tuple.parent?.is(FunctionCallExprSyntax.self) == true,
       expr.is(ClosureExprSyntax.self)
     {
       return false
@@ -118,7 +130,7 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     // e.g., `(try? f()).description` is different from `try? f().description`.
     // The former accesses `.description` on the Optional result, the latter on the unwrapped value.
     // Similarly, `(try? f()) + 1` is different from `try? f() + 1` (Int? + Int vs Int + Int).
-    if parentHasTighterBindingThanEffect(parent) {
+    if let parent = tuple.parent, hasTighterBindingThanEffect(parent) {
       switch expr.as(ExprSyntaxEnum.self) {
       case .tryExpr, .awaitExpr, .unsafeExpr, .consumeExpr, .copyExpr:
         return false
@@ -130,25 +142,32 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     return true
   }
 
-  /// Returns true if parent is an expression with higher precedence than effects (try/await/etc).
+  /// Returns true if the node is an expression with higher precedence than effects (try/await/etc).
   /// This includes postfix expressions (member access, subscript, call, force unwrap, optional chaining),
   /// infix operators, type casting (as/is), and ternary expressions.
-  private static func parentHasTighterBindingThanEffect(_ parent: Syntax?) -> Bool {
-    switch parent?.as(SyntaxEnum.self) {
+  private static func hasTighterBindingThanEffect(_ node: Syntax) -> Bool {
+    if node.is(ExprListSyntax.self) {
+      return true
+    }
+
+    guard let expr = node.as(ExprSyntax.self) else {
+      return false
+    }
+    switch expr.as(ExprSyntaxEnum.self) {
     // Postfix expressions: member access, subscript, function call, force unwrap, and postfix operators
     // These all bind tighter than effect expressions (try/await/etc).
     // For member access, since we're a TupleExprSyntax, we are always the base.
     case .memberAccessExpr, .subscriptCallExpr, .functionCallExpr, .forceUnwrapExpr, .postfixOperatorExpr:
       return true
 
-    case .optionalChainingExpr(let optionalChaining):
+    case .optionalChainingExpr:
       // Optional chaining (?.) binds tighter than effects
-      return optionalChaining.expression != nil
+      return true
 
     // Infix operators and sequence expressions bind tighter than effects.
     // For sequence expressions (before SwiftOperators folding), the parent chain
     // is: TupleExpr -> ExprList -> SequenceExpr, e.g., `(try? f()) + 1`.
-    case .infixOperatorExpr, .sequenceExpr, .exprList:
+    case .infixOperatorExpr, .sequenceExpr:
       return true
 
     // Type casting operators (as, is) bind tighter than effects.
@@ -156,7 +175,18 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     case .asExpr, .isExpr, .ternaryExpr:
       return true
 
-    default:
+    // All other expression types do not bind tighter than effects
+    case .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
+      .booleanLiteralExpr, .borrowExpr, ._canImportExpr, ._canImportVersionInfo,
+      .closureExpr, .consumeExpr, .copyExpr, .declReferenceExpr, .dictionaryExpr,
+      .discardAssignmentExpr, .doExpr, .editorPlaceholderExpr, .floatLiteralExpr,
+      .genericSpecializationExpr, .ifExpr, .inOutExpr, .integerLiteralExpr,
+      .keyPathExpr, .macroExpansionExpr, .missingExpr, .nilLiteralExpr,
+      .packElementExpr, .packExpansionExpr, .patternExpr, .postfixIfConfigExpr,
+      .prefixOperatorExpr, .regexLiteralExpr, .simpleStringLiteralExpr,
+      .stringLiteralExpr, .superExpr, .switchExpr, .tryExpr, .tupleExpr,
+      .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr, .unresolvedTernaryExpr,
+      .unsafeExpr:
       return false
     }
   }
@@ -207,6 +237,7 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     // in a way that requires parentheses when used in most contexts,
     // or are self-contained.
     switch expr.as(ExprSyntaxEnum.self) {
+    // Simple expressions that don't require parentheses
     case .arrayExpr,
       .booleanLiteralExpr,
       .closureExpr,
@@ -225,15 +256,15 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
       .subscriptCallExpr,
       .superExpr:
       return true
+
+    // Types, effects, await, unsafe are simple only if the underlying type is simple
     case .typeExpr(let typeExpr):
-      // Types like `any Equatable` need parentheses, e.g. `(any Equatable).self`
       return isSimpleType(typeExpr.type)
     case .awaitExpr(let awaitExpr):
-      // await is only simple if its expression is also simple
       return isSimpleExpression(awaitExpr.expression)
     case .unsafeExpr(let unsafeExpr):
-      // Similar to await, unsafe is only simple if its expression is simple
       return isSimpleExpression(unsafeExpr.expression)
+
     case .tryExpr(let tryExpr):
       // Only try! and try? are simple; regular try is NOT simple
       // because it affects precedence (e.g., try (try! foo()).bar() vs try try! foo().bar())
@@ -247,7 +278,40 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
       // Without parentheses, `let x = { 1 }()` parses as `let x = { 1 }` followed by `()` as a separate
       // statement, rather than calling the closure. With parentheses: `let x = ({ 1 })()` works correctly.
       return !functionCall.calledExpression.is(ClosureExprSyntax.self)
-    default:
+
+    // Complex expressions that are NOT simple
+    case .arrowExpr,
+      .asExpr,
+      .assignmentExpr,
+      .binaryOperatorExpr,
+      .borrowExpr,
+      ._canImportExpr,
+      ._canImportVersionInfo,
+      .consumeExpr,
+      .copyExpr,
+      .discardAssignmentExpr,
+      .doExpr,
+      .editorPlaceholderExpr,
+      .genericSpecializationExpr,
+      .ifExpr,
+      .inOutExpr,
+      .infixOperatorExpr,
+      .isExpr,
+      .keyPathExpr,
+      .missingExpr,
+      .packElementExpr,
+      .packExpansionExpr,
+      .patternExpr,
+      .postfixIfConfigExpr,
+      .postfixOperatorExpr,
+      .prefixOperatorExpr,
+      .sequenceExpr,
+      .switchExpr,
+      .ternaryExpr,
+      .tupleExpr,
+      .unresolvedAsExpr,
+      .unresolvedIsExpr,
+      .unresolvedTernaryExpr:
       return false
     }
   }
