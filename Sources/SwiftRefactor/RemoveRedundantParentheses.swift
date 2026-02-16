@@ -76,31 +76,42 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     // Safety Check: Ambiguous Closures
     // Closures and trailing closures inside conditions need parentheses to avoid ambiguity.
     // e.g. `if ({ true }) == ({ true }) {}` or `if (call { true }) == false {}`
-    // This applies to if/while/guard (ConditionElementSyntax) and repeat-while (RepeatStmtSyntax).
+    // This applies to if/while/guard (ConditionElementSyntax), repeat-while (RepeatStmtSyntax),
+    // and where clauses (WhereClauseSyntax).
     // It also applies to InitializerClauseSyntax if it is inside a condition (e.g. `if let x = ({...})`).
-    let keyPath = tuple.keyPathInParent
-    let isInCondition =
-      keyPath == \ConditionElementSyntax.condition
-      || keyPath == \RepeatStmtSyntax.condition
-      || tuple.parent?.ancestorOrSelf(mapping: {
-        switch $0.keyPathInParent {
-        case \ConditionElementSyntax.condition, \RepeatStmtSyntax.condition:
-          return $0
-        default:
-          return nil
-        }
-      }) != nil
+    let isInCondition = isInContext(
+      tuple,
+      keyPaths: [
+        \ConditionElementSyntax.condition,
+        \RepeatStmtSyntax.condition,
+        \WhereClauseSyntax.condition,
+      ]
+    )
 
-    if isInCondition && (expr.is(ClosureExprSyntax.self) || hasTrailingClosure(expr)) {
+    let isInSwitchSubject = isInContext(tuple, keyPaths: [\SwitchExprSyntax.subject])
+    let isInForInSequence = isInContext(tuple, keyPaths: [\ForInStmtSyntax.sequence])
+
+    if isInCondition && requiresParenForAmbiguousClosure(expr) {
       return false
     }
 
     // Safety Check: Immediately-invoked closures
     // If parent is a FunctionCallExprSyntax and inner expr is a closure, it's an IIFE.
     // The parentheses are required for disambiguation: `let x = ({ 1 })()` not `let x = { 1 }()`.
-    if tuple.parent?.is(FunctionCallExprSyntax.self) == true,
-      expr.is(ClosureExprSyntax.self)
-    {
+    if tuple.parent?.is(FunctionCallExprSyntax.self) == true, expr.is(ClosureExprSyntax.self) {
+      return false
+    }
+
+    // Safety Check: Switch subjects
+    // `switch { true } {}` is invalid; a closure literal must be parenthesized.
+    if isInSwitchSubject && requiresParenForAmbiguousClosure(expr) {
+      return false
+    }
+
+    // Safety Check: for-in sequences
+    // Trailing closures (or IIFEs) in the sequence position should keep parentheses
+    // to avoid ambiguity warnings (e.g. `for _ in (call { ... })`).
+    if isInForInSequence && requiresParenForAmbiguousClosure(expr) {
       return false
     }
 
@@ -204,6 +215,45 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     }
   }
 
+  private static func requiresParenForAmbiguousClosure(_ expr: ExprSyntax) -> Bool {
+    expr.is(ClosureExprSyntax.self)
+      || hasTrailingClosure(expr)
+      || isImmediatelyInvokedClosure(expr)
+  }
+
+  private static func isInContext(_ tuple: TupleExprSyntax, keyPaths: [AnyKeyPath]) -> Bool {
+    if let keyPathInParent = tuple.keyPathInParent,
+      keyPaths.contains(where: { $0 == keyPathInParent })
+    {
+      return true
+    }
+    var current = tuple.parent
+    while let node = current {
+      if let keyPathInParent = node.keyPathInParent,
+        keyPaths.contains(where: { $0 == keyPathInParent })
+      {
+        return true
+      }
+      current = node.parent
+    }
+    return false
+  }
+
+  private static func isImmediatelyInvokedClosure(_ expr: ExprSyntax) -> Bool {
+    guard let functionCall = expr.as(FunctionCallExprSyntax.self) else {
+      return false
+    }
+    if functionCall.calledExpression.is(ClosureExprSyntax.self) {
+      return true
+    }
+    if let tuple = functionCall.calledExpression.as(TupleExprSyntax.self),
+      tuple.elements.singleUnlabeledExpression?.is(ClosureExprSyntax.self) == true
+    {
+      return true
+    }
+    return false
+  }
+
   /// Checks if a type is simple enough to not require parentheses.
   /// Complex types like `any Equatable`, `some P`, or `A & B` need parentheses, e.g. `(any Equatable).self`.
   private static func isSimpleType(_ type: TypeSyntax) -> Bool {
@@ -233,7 +283,7 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
   }
 
   private static func isSimpleExpression(_ expr: ExprSyntax) -> Bool {
-    // Allow-list of simple expressions that typically don't depend on precedence
+    // Allowlist of simple expressions that typically don't depend on precedence
     // in a way that requires parentheses when used in most contexts,
     // or are self-contained.
     switch expr.as(ExprSyntaxEnum.self) {
