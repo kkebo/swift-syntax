@@ -46,23 +46,23 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
   }
 
   func testPreservesNecessaryParentheses() throws {
-    try assertParenRemoval("(1 + 2)", expected: "(1 + 2)")
-    try assertParenRemoval("(x as T)", expected: "(x as T)")
-    try assertParenRemoval("(x ? y : z)", expected: "(x ? y : z)")
-    try assertParenRemoval("({ true }())", expected: "({ true }())")
+    try assertParenRemoval("(1 + 2)")
+    try assertParenRemoval("(x as T)")
+    try assertParenRemoval("(x ? y : z)")
+    try assertParenRemoval("({ true }())")
     // try without ! or ? requires parentheses for precedence
-    try assertParenRemoval("(try f())", expected: "(try f())")
+    try assertParenRemoval("(try f())")
     // await with complex expression requires parentheses
-    try assertParenRemoval("(await 1 + 2)", expected: "(await 1 + 2)")
+    try assertParenRemoval("(await 1 + 2)")
 
     // Complex called expressions in function calls need parentheses
-    try assertParenRemoval("(a + b)()", expected: "(a + b)()")
-    try assertParenRemoval("(a as! () -> Void)()", expected: "(a as! () -> Void)()")
+    try assertParenRemoval("(a + b)()")
+    try assertParenRemoval("(a as! () -> Void)()")
     // Outer parentheses should still be removable if the inner one is preserved
     try assertParenRemoval("((a + b)())", expected: "(a + b)()")
 
     // IIFE must keep parentheses around the closure
-    try assertParenRemoval("({ 1 })()", expected: "({ 1 })()")
+    try assertParenRemoval("({ 1 })()")
   }
 
   func testTupleHandling() throws {
@@ -97,47 +97,46 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
 
   func testPreservesParenthesesInConditions() throws {
     // Closures in conditions need parentheses
-    try assertParenRemoval("if ({ true }) {}", expected: "if ({ true }) {}")
-    try assertParenRemoval("if (call { true }) {}", expected: "if (call { true }) {}")
-    try assertParenRemoval("while ({ true }) {}", expected: "while ({ true }) {}")
-    try assertParenRemoval("guard (call { true }) else {}", expected: "guard (call { true }) else {}")
+    try assertParenRemoval("if ({ true }) {}")
+    try assertParenRemoval("if (call { true }) {}")
+    try assertParenRemoval("while ({ true }) {}")
+    try assertParenRemoval("guard (call { true }) else {}")
     // Nested in sequence expressions
-    try assertParenRemoval("if ({ true }) == ({ true }) {}", expected: "if ({ true }) == ({ true }) {}")
+    try assertParenRemoval("if ({ true }) == ({ true }) {}")
     // Macro expansions with trailing closures
-    try assertParenRemoval("if (#macro { true }) == false {}", expected: "if (#macro { true }) == false {}")
+    try assertParenRemoval("if (#macro { true }) == false {}")
     // Subscripts with trailing closures
-    try assertParenRemoval("if (array[0] { true }) == false {}", expected: "if (array[0] { true }) == false {}")
+    try assertParenRemoval("if (array[0] { true }) == false {}")
 
     // Complex trailing closures in conditions
-    try assertParenRemoval("if (call { true }) == false {}", expected: "if (call { true }) == false {}")
-    try assertParenRemoval("if let x: () -> Bool = ({ true }) {}", expected: "if let x: () -> Bool = ({ true }) {}")
+    try assertParenRemoval("if (call { true }) == false {}")
+    try assertParenRemoval("if let x: () -> Bool = ({ true }) {}")
 
     // Immediately-invoked closures in conditions must keep parentheses.
-    try assertParenRemoval("if ({ true }()) {}", expected: "if ({ true }()) {}")
+    try assertParenRemoval("if ({ true }()) {}")
 
     // Trivia around parentheses should be preserved when parentheses are required.
     try assertParenRemoval(
-      "if /*a*/ ( /*b*/ { true }() /*c*/ ) /*d*/ {}",
-      expected: "if /*a*/ ( /*b*/ { true }() /*c*/ ) /*d*/ {}"
+      "if /*a*/ ( /*b*/ { true }() /*c*/ ) /*d*/ {}"
     )
 
     // Repeat-while conditions with nested or trailing closures
-    try assertParenRemoval("repeat {} while call(({ true }))", expected: "repeat {} while call(({ true }))")
-    try assertParenRemoval("repeat {} while (call { true })", expected: "repeat {} while (call { true })")
+    try assertParenRemoval("repeat {} while call(({ true }))")
+    try assertParenRemoval("repeat {} while (call { true })")
   }
 
   func testPreservesParenthesesForMetatypes() throws {
     // e.g., `(any Equatable).self` must not become `any Equatable.self`
-    try assertParenRemoval("(any Equatable).self", expected: "(any Equatable).self")
-    try assertParenRemoval("(some P).self", expected: "(some P).self")
-    try assertParenRemoval("(A & B).self", expected: "(A & B).self")
-    try assertParenRemoval("(any Equatable).Type", expected: "(any Equatable).Type")
-    try assertParenRemoval("(some P).Type", expected: "(some P).Type")
-    try assertParenRemoval("(A & B).Type", expected: "(A & B).Type")
-    try assertParenRemoval("(any Equatable).Protocol", expected: "(any Equatable).Protocol")
-    try assertParenRemoval("(A & B).Protocol", expected: "(A & B).Protocol")
-    try assertParenRemoval("(@escaping () -> Int).self", expected: "(@escaping () -> Int).self")
-    try assertParenRemoval("(T...).self", expected: "(T...).self")
+    try assertParenRemoval("(any Equatable).self")
+    try assertParenRemoval("(some P).self")
+    try assertParenRemoval("(A & B).self")
+    try assertParenRemoval("(any Equatable).Type")
+    try assertParenRemoval("(some P).Type")
+    try assertParenRemoval("(A & B).Type")
+    try assertParenRemoval("(any Equatable).Protocol")
+    try assertParenRemoval("(A & B).Protocol")
+    try assertParenRemoval("(@escaping () -> Int).self")
+    try assertParenRemoval("(T...).self")
 
     // Simple types allow removing parentheses
     try assertParenRemoval("(MyStruct).self", expected: "MyStruct.self")
@@ -148,65 +147,62 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
   func testPreservesParenthesesForPostfixExpressions() throws {
     // `try?` binds looser than member access.
     // `(try? f()).description` operates on `Optional<T>`, while `try? f().description` operates on `T`.
-    try assertParenRemoval("(try? f()).description", expected: "(try? f()).description")
-    try assertParenRemoval("(try! f()).description", expected: "(try! f()).description")
+    try assertParenRemoval("(try? f()).description")
+    try assertParenRemoval("(try! f()).description")
 
     // `try?` also binds looser than optional chaining.
     // `(try? f())?.bar` is different from `try? f()?.bar`.
-    try assertParenRemoval("(try? f())?.bar", expected: "(try? f())?.bar")
-    try assertParenRemoval("(try! f())?.bar", expected: "(try! f())?.bar")
+    try assertParenRemoval("(try? f())?.bar")
+    try assertParenRemoval("(try! f())?.bar")
 
     // `await` also binds looser than member access.
-    try assertParenRemoval("(await f()).description", expected: "(await f()).description")
+    try assertParenRemoval("(await f()).description")
 
     // `consume` and `copy` also bind looser than member access.
-    try assertParenRemoval("(consume x).property", expected: "(consume x).property")
-    try assertParenRemoval("(copy x).property", expected: "(copy x).property")
+    try assertParenRemoval("(consume x).property")
+    try assertParenRemoval("(copy x).property")
 
     // Infix operators bind tighter than effects
     // `(try? f()) + 1` is `Optional<Int> + Int` while `try? f() + 1` is `Int + Int`.
-    try assertParenRemoval("(try? f()) + 1", expected: "(try? f()) + 1")
-    try assertParenRemoval("(try! f()) + 1", expected: "(try! f()) + 1")
-    try assertParenRemoval("(await f()) + 1", expected: "(await f()) + 1")
+    try assertParenRemoval("(try? f()) + 1")
+    try assertParenRemoval("(try! f()) + 1")
+    try assertParenRemoval("(await f()) + 1")
 
     // Type casting binds tighter than effects
     // `(try? f()) as Int` is different from `try? f() as Int`.
-    try assertParenRemoval("(try? f()) as Int", expected: "(try? f()) as Int")
-    try assertParenRemoval("(try! f()) as Int", expected: "(try! f()) as Int")
-    try assertParenRemoval("(await f()) as Int", expected: "(await f()) as Int")
+    try assertParenRemoval("(try? f()) as Int")
+    try assertParenRemoval("(try! f()) as Int")
+    try assertParenRemoval("(await f()) as Int")
     // `is` check
-    try assertParenRemoval("(try? f()) is Int", expected: "(try? f()) is Int")
+    try assertParenRemoval("(try? f()) is Int")
 
     // Ternary operator binds tighter than effects
     // `(try? f()) ? x : y` is different from `try? f() ? x : y`.
-    try assertParenRemoval("(try? f()) ? x : y", expected: "(try? f()) ? x : y")
-    try assertParenRemoval("(await f()) ? x : y", expected: "(await f()) ? x : y")
+    try assertParenRemoval("(try? f()) ? x : y")
+    try assertParenRemoval("(await f()) ? x : y")
 
     // Force unwrap binds tighter than effects
     // `(try? f())!` is different from `try? f()!`.
-    try assertParenRemoval("(try? f())!", expected: "(try? f())!")
-    try assertParenRemoval("(await f())!", expected: "(await f())!")
+    try assertParenRemoval("(try? f())!")
+    try assertParenRemoval("(await f())!")
   }
 
   func testPreservesParenthesesForEffectsInConditionsAndStatements() throws {
     // Conditions should not drop parentheses that preserve effect binding.
     try assertParenRemoval(
-      "if (try? f()).description == \"x\" {}",
-      expected: "if (try? f()).description == \"x\" {}"
+      "if (try? f()).description == \"x\" {}"
     )
     try assertParenRemoval(
-      "if (await f()).description == \"x\" {}",
-      expected: "if (await f()).description == \"x\" {}"
+      "if (await f()).description == \"x\" {}"
     )
 
     // Return/throw should not drop parentheses that preserve effect binding.
-    try assertParenRemoval("return (try? f()).description", expected: "return (try? f()).description")
-    try assertParenRemoval("throw (try? f()).description", expected: "throw (try? f()).description")
+    try assertParenRemoval("return (try? f()).description")
+    try assertParenRemoval("throw (try? f()).description")
 
     // Switch subject should not drop parentheses that preserve effect binding.
     try assertParenRemoval(
-      "switch (try? f()).description { default: break }",
-      expected: "switch (try? f()).description { default: break }"
+      "switch (try? f()).description { default: break }"
     )
   }
 
@@ -235,90 +231,76 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
     // A closure literal as the switch subject requires parentheses.
     // `switch { true } {}` is invalid syntax.
     try assertParenRemoval(
-      "switch ({ true }) { default: break }",
-      expected: "switch ({ true }) { default: break }"
+      "switch ({ true }) { default: break }"
     )
 
     // Trailing closures in switch subjects should keep parentheses to avoid ambiguity warnings.
     try assertParenRemoval(
-      "switch (call { true }) { default: break }",
-      expected: "switch (call { true }) { default: break }"
+      "switch (call { true }) { default: break }"
     )
 
     // Macro expansions with trailing closures in switch subjects should keep parentheses.
     try assertParenRemoval(
-      "switch (#macro { true }) { default: break }",
-      expected: "switch (#macro { true }) { default: break }"
+      "switch (#macro { true }) { default: break }"
     )
 
     // Subscripts with trailing closures in switch subjects should keep parentheses.
     try assertParenRemoval(
-      "switch (array[0] { true }) { default: break }",
-      expected: "switch (array[0] { true }) { default: break }"
+      "switch (array[0] { true }) { default: break }"
     )
 
     // Trailing closures inside switch subject expressions should keep parentheses.
     try assertParenRemoval(
-      "switch (call { true }) == false { default: break }",
-      expected: "switch (call { true }) == false { default: break }"
+      "switch (call { true }) == false { default: break }"
     )
 
     // Immediately-invoked closures in switch subjects must keep parentheses.
     try assertParenRemoval(
-      "switch ({ true }()) { default: break }",
-      expected: "switch ({ true }()) { default: break }"
+      "switch ({ true }()) { default: break }"
     )
   }
 
   func testPreservesParenthesesInForInSequence() throws {
     // Trailing closures in for-in sequences should keep parentheses to avoid ambiguity warnings.
     try assertParenRemoval(
-      "for _ in (call { true }) {}",
-      expected: "for _ in (call { true }) {}"
+      "for _ in (call { true }) {}"
     )
 
     // Macro expansions with trailing closures in for-in sequences should keep parentheses.
     try assertParenRemoval(
-      "for _ in (#macro { true }) {}",
-      expected: "for _ in (#macro { true }) {}"
+      "for _ in (#macro { true }) {}"
     )
 
     // Subscripts with trailing closures in for-in sequences should keep parentheses.
     try assertParenRemoval(
-      "for _ in (array[0] { true }) {}",
-      expected: "for _ in (array[0] { true }) {}"
+      "for _ in (array[0] { true }) {}"
     )
 
     // Immediately-invoked closures in for-in sequences must keep parentheses.
     try assertParenRemoval(
-      "for _ in ({ true }()) {}",
-      expected: "for _ in ({ true }()) {}"
+      "for _ in ({ true }()) {}"
     )
 
     // Trivia around parentheses should be preserved when parentheses are required.
     try assertParenRemoval(
-      "for _ in /*a*/ ( /*b*/ call { true } /*c*/ ) /*d*/ {}",
-      expected: "for _ in /*a*/ ( /*b*/ call { true } /*c*/ ) /*d*/ {}"
+      "for _ in /*a*/ ( /*b*/ call { true } /*c*/ ) /*d*/ {}"
     )
   }
 
   func testPreservesParenthesesInWhereClauses() throws {
     // Trailing closures in catch-where clauses should keep parentheses.
     try assertParenRemoval(
-      "do {} catch where (call { true }) { }",
-      expected: "do {} catch where (call { true }) { }"
+      "do {} catch where (call { true }) { }"
     )
 
     // Trailing closures in for-in where clauses should keep parentheses.
     try assertParenRemoval(
-      "for _ in [1] where (call { true }) {}",
-      expected: "for _ in [1] where (call { true }) {}"
+      "for _ in [1] where (call { true }) {}"
     )
 
     // Trivia around parentheses should be preserved when parentheses are required.
     try assertParenRemoval(
-      "for _ in [1] where /*a*/ ( /*b*/ call { true } /*c*/ ) /*d*/ {}",
-      expected: "for _ in [1] where /*a*/ ( /*b*/ call { true } /*c*/ ) /*d*/ {}"
+      "for _ in [1] where /*a*/ ( /*b*/ call { true } /*c*/ ) /*d*/ {}"
     )
   }
 
@@ -326,12 +308,12 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
     // Sequence expressions (before SwiftOperators folding) bind tighter than effects.
     // In `(try? f()) + 1`, the parentheses must be preserved because the sequence
     // expression structure makes `try? f()` the left operand of `+`.
-    try assertParenRemoval("(try? f()) - 1", expected: "(try? f()) - 1")
-    try assertParenRemoval("(try? f()) * 1", expected: "(try? f()) * 1")
+    try assertParenRemoval("(try? f()) - 1")
+    try assertParenRemoval("(try? f()) * 1")
 
     // Complex sequence expressions
-    try assertParenRemoval("(try? f()) + g() + h()", expected: "(try? f()) + g() + h()")
-    try assertParenRemoval("(await f()) + g()", expected: "(await f()) + g()")
+    try assertParenRemoval("(try? f()) + g() + h()")
+    try assertParenRemoval("(await f()) + g()")
   }
 
   func testParenthesesInRepeatWhileBody() throws {
@@ -346,9 +328,10 @@ final class RemoveRedundantParenthesesTest: XCTestCase {
 // MARK: - Test Helper
 
 /// Applies `RemoveRedundantParentheses` to all tuple expressions in the input and compares to expected.
+/// When `expected` is `nil`, asserts that the input is unchanged.
 private func assertParenRemoval(
   _ input: String,
-  expected: String,
+  expected: String? = nil,
   file: StaticString = #filePath,
   line: UInt = #line
 ) throws {
@@ -358,30 +341,30 @@ private func assertParenRemoval(
   let rewriter = ParenRemovalRewriter()
   let result = rewriter.visit(inputSyntax)
 
-  // Trim trailing newline that SourceFileSyntax adds
-  let resultString = result.description.trimmingCharacters(in: .newlines)
+  if let error = rewriter.unexpectedError {
+    throw error
+  }
 
-  assertStringsEqualWithDiff(
-    resultString,
-    expected,
-    file: file,
-    line: line
-  )
+  let resultString = result.description.trimmingCharacters(in: .newlines)
+  assertStringsEqualWithDiff(resultString, expected ?? input, file: file, line: line)
 }
 
 /// A SyntaxRewriter that applies `RemoveRedundantParentheses` to all tuple expressions.
 private class ParenRemovalRewriter: SyntaxRewriter {
+  var unexpectedError: Error?
+
   override func visit(_ node: TupleExprSyntax) -> ExprSyntax {
-    // First, recursively process children
     let visited = super.visit(node)
     guard let tuple = visited.as(TupleExprSyntax.self) else {
       return visited
     }
-    // Then apply the refactoring
     do {
       return try RemoveRedundantParentheses.refactor(syntax: tuple, in: ())
+    } catch is RefactoringNotApplicableError {
+      return ExprSyntax(tuple)
     } catch {
-      return ExprSyntax(tuple)  // Return unchanged if refactoring not applicable
+      unexpectedError = error
+      return ExprSyntax(tuple)
     }
   }
 }

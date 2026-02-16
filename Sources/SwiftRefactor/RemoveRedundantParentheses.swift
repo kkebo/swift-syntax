@@ -73,6 +73,14 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
   }
 
   private static func canRemoveParentheses(tuple: TupleExprSyntax, around expr: ExprSyntax) -> Bool {
+
+    // Safety Check: Immediately-invoked closures
+    // If parent is a FunctionCallExprSyntax and inner expr is a closure, it's an IIFE.
+    // The parentheses are required for disambiguation: `let x = ({ 1 })()` not `let x = { 1 }()`.
+    if let parent = tuple.parent, parent.is(FunctionCallExprSyntax.self), expr.is(ClosureExprSyntax.self) {
+      return false
+    }
+
     // Safety Check: Ambiguous Closures
     // Closures and trailing closures inside conditions need parentheses to avoid ambiguity.
     // e.g. `if ({ true }) == ({ true }) {}` or `if (call { true }) == false {}`
@@ -91,14 +99,8 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     let isInSwitchSubject = isInContext(tuple, keyPaths: [\SwitchExprSyntax.subject])
     let isInForInSequence = isInContext(tuple, keyPaths: [\ForInStmtSyntax.sequence])
 
+    // Safety Check: Conditions and where clauses
     if isInCondition && requiresParenForAmbiguousClosure(expr) {
-      return false
-    }
-
-    // Safety Check: Immediately-invoked closures
-    // If parent is a FunctionCallExprSyntax and inner expr is a closure, it's an IIFE.
-    // The parentheses are required for disambiguation: `let x = ({ 1 })()` not `let x = { 1 }()`.
-    if tuple.parent?.is(FunctionCallExprSyntax.self) == true, expr.is(ClosureExprSyntax.self) {
       return false
     }
 
@@ -119,12 +121,12 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
     // occurs in a place where the parentheses are redundant.
     if let keyPath = tuple.keyPathInParent {
       switch keyPath {
-      case \InitializerClauseSyntax.value,
-        \ConditionElementSyntax.condition,
+      case \ConditionElementSyntax.condition,
+        \InitializerClauseSyntax.value,
+        \RepeatStmtSyntax.condition,
         \ReturnStmtSyntax.expression,
-        \ThrowStmtSyntax.expression,
         \SwitchExprSyntax.subject,
-        \RepeatStmtSyntax.condition:
+        \ThrowStmtSyntax.expression:
         return true
       default:
         break
