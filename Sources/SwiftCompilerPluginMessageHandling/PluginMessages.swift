@@ -132,7 +132,7 @@ public enum PluginMessage {
     case codeItem
     case `extension`
     @_spi(ExperimentalLanguageFeature) case preamble
-    @_spi(ExperimentalLanguageFeature) case body
+    case body
   }
 
   public struct SourceLocation: Codable {
