@@ -31,7 +31,7 @@ public enum MacroRole: Sendable {
   case codeItem
   case `extension`
   @_spi(ExperimentalLanguageFeature) case preamble
-  @_spi(ExperimentalLanguageFeature) case body
+  case body
 }
 
 extension MacroRole {
