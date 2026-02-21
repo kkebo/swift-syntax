@@ -73,9 +73,8 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
   }
 
   private static func canRemoveParentheses(tuple: TupleExprSyntax, around expr: ExprSyntax) -> Bool {
-
     // Safety Check: Immediately-invoked closures
-    // If parent is a FunctionCallExprSyntax and inner expr is a closure, it's an IIFE.
+    // If parent is a FunctionCallExprSyntax and inner expr is a closure, it's an immediately invoked closure.
     // The parentheses are required for disambiguation: `let x = ({ 1 })()` not `let x = { 1 }()`.
     if let parent = tuple.parent, parent.is(FunctionCallExprSyntax.self), expr.is(ClosureExprSyntax.self) {
       return false
@@ -224,21 +223,14 @@ public struct RemoveRedundantParentheses: SyntaxRefactoringProvider {
   }
 
   private static func isInContext(_ tuple: TupleExprSyntax, keyPaths: [AnyKeyPath]) -> Bool {
-    if let keyPathInParent = tuple.keyPathInParent,
-      keyPaths.contains(where: { $0 == keyPathInParent })
-    {
-      return true
-    }
-    var current = tuple.parent
-    while let node = current {
+    return tuple.ancestorOrSelf(mapping: { node in
       if let keyPathInParent = node.keyPathInParent,
         keyPaths.contains(where: { $0 == keyPathInParent })
       {
         return true
       }
-      current = node.parent
-    }
-    return false
+      return nil
+    }) ?? false
   }
 
   private static func isImmediatelyInvokedClosure(_ expr: ExprSyntax) -> Bool {
