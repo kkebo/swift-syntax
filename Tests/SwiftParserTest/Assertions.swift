@@ -757,9 +757,8 @@ extension ParserTestCase {
     }
 
     if !longTestsDisabled {
-      #if !os(WASI)
-      DispatchQueue.concurrentPerform(iterations: Array(tree.tokens(viewMode: .all)).count) { tokenIndex in
-        let flippedTokenTree = TokenPresenceFlipper(flipTokenAtIndex: tokenIndex).rewrite(Syntax(tree))
+      @Sendable func diagnosticsAndAssert(index: Int) {
+        let flippedTokenTree = TokenPresenceFlipper(flipTokenAtIndex: index).rewrite(Syntax(tree))
         _ = ParseDiagnosticsGenerator.diagnostics(for: flippedTokenTree)
         Self.assertMutationRoundTrip(
           source: flippedTokenTree.syntaxTextBytes,
@@ -770,18 +769,13 @@ extension ParserTestCase {
           line: line
         )
       }
+      #if !os(WASI)
+      DispatchQueue.concurrentPerform(iterations: Array(tree.tokens(viewMode: .all)).count) { tokenIndex in
+        diagnosticsAndAssert(index: tokenIndex)
+      }
       #else
       for tokenIndex in Array(tree.tokens(viewMode: .all)).indices {
-        let flippedTokenTree = TokenPresenceFlipper(flipTokenAtIndex: tokenIndex).rewrite(Syntax(tree))
-        _ = ParseDiagnosticsGenerator.diagnostics(for: flippedTokenTree)
-        Self.assertMutationRoundTrip(
-          source: flippedTokenTree.syntaxTextBytes,
-          parse,
-          swiftVersion: swiftVersion,
-          experimentalFeatures: experimentalFeatures,
-          file: file,
-          line: line
-        )
+        diagnosticsAndAssert(index: tokenIndex)
       }
       #endif
 
@@ -791,8 +785,7 @@ extension ParserTestCase {
         replacements in
         return replacements.map { (offset, $0) }
       }
-      #if !os(WASI)
-      DispatchQueue.concurrentPerform(iterations: mutations.count) { index in
+      @Sendable func printAndAssert(index: Int) {
         let mutation = mutations[index]
         let alternateSource = MutatedTreePrinter.print(
           tree: Syntax(tree),
@@ -807,21 +800,13 @@ extension ParserTestCase {
           line: line
         )
       }
+      #if !os(WASI)
+      DispatchQueue.concurrentPerform(iterations: mutations.count) { index in
+        printAndAssert(index: index)
+      }
       #else
       for index in mutations.indices {
-        let mutation = mutations[index]
-        let alternateSource = MutatedTreePrinter.print(
-          tree: Syntax(tree),
-          mutations: [mutation.offset: mutation.replacement]
-        )
-        assertMutationRoundTrip(
-          source: alternateSource,
-          parse,
-          swiftVersion: swiftVersion,
-          experimentalFeatures: experimentalFeatures,
-          file: file,
-          line: line
-        )
+        printAndAssert(index: index)
       }
       #endif
       #endif
