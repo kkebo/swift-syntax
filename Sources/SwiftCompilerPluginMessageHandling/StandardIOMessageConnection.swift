@@ -62,9 +62,6 @@ public struct StandardIOMessageConnection: MessageConnection {
   ///   - Duplicate the original `stdin` and `stdout` for use as messaging
   ///     pipes, and are not directly used by the plugin logic
   public init() throws {
-    #if os(WASI)
-    fatalError("not implemented")
-    #else
     // Duplicate the `stdin` file descriptor, which we will then use for
     // receiving messages from the plugin host.
     let inputFD = dup(fileno(swift_syntax_stdin))
@@ -99,7 +96,6 @@ public struct StandardIOMessageConnection: MessageConnection {
     #endif
 
     self.init(inputFileDescriptor: inputFD, outputFileDescriptor: outputFD)
-    #endif
   }
   #endif
 
