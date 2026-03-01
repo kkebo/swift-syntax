@@ -102,14 +102,12 @@ public class LibraryPluginProvider: PluginProvider {
       return
     }
 
-    #if !os(WASI)
     let dlHandle = try _loadLibrary(libraryPath)
 
     loadedLibraryPlugins[moduleName] = LoadedLibraryPlugin(
       libraryPath: libraryPath,
       handle: dlHandle
     )
-    #endif
   }
 
   public func resolveMacro(moduleName: String, typeName: String) throws -> SwiftSyntaxMacros.Macro.Type {
@@ -160,7 +158,7 @@ private func _loadLibrary(_ path: String) throws -> UnsafeMutableRawPointer {
   }
   return UnsafeMutableRawPointer(dlHandle)
 }
-#elseif !os(WASI)
+#else
 private func _loadLibrary(_ path: String) throws -> UnsafeMutableRawPointer {
   guard let dlHandle = dlopen(path, RTLD_LAZY | RTLD_LOCAL) else {
     throw LibraryPluginError(message: "loader error: \(String(cString: dlerror()!))")
