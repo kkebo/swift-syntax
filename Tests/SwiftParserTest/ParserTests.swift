@@ -76,7 +76,7 @@ class ParserTests: ParserTestCase {
           try Self.runParseTest(fileURL: fileURL, checkDiagnostics: checkDiagnostics)
         }
       }
-      try await group.next()
+      try await group.waitForAll()
     }
   }
 
