@@ -135,6 +135,9 @@ extension Parser {
     source: String,
     parseTransition: IncrementalParseTransition?
   ) -> IncrementalParseResult {
+    // Drop the transition (forcing a full reparse) when the previous tree is
+    // fragmented enough that this parse would reach its compaction threshold.
+    let parseTransition = (parseTransition?.shouldCompact ?? false) ? nil : parseTransition
     return withParser(
       source: source,
       maximumNestingLevel: nil,
@@ -153,6 +156,7 @@ extension Parser {
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition?
   ) -> IncrementalParseResult {
+    let parseTransition = (parseTransition?.shouldCompact ?? false) ? nil : parseTransition
     return withParser(
       source: source,
       maximumNestingLevel: maximumNestingLevel,
