@@ -277,13 +277,25 @@ public struct Parser {
     }
   }
 
-  /// Private initializer for creating a ``Parser`` from the given string.
-  private init(
-    string input: String,
-    maximumNestingLevel: Int?,
-    parseTransition: IncrementalParseTransition?,
-    swiftVersion: SwiftVersion?,
-    experimentalFeatures: ExperimentalFeatures
+  /// Initializes a ``Parser`` from the given string.
+  ///
+  /// - Parameters:
+  ///   - input: The source text to parse.
+  ///   - maximumNestingLevel: To avoid overflowing the stack, the parser will
+  ///                          stop if a nesting level greater than this value
+  ///                          is reached. `defaultMaximumNestingLevel` is used
+  ///                          if this is `nil`.
+  ///   - parseTransition: The previously recorded state for an incremental
+  ///                      parse, or `nil`.
+  ///   - swiftVersion: The version of Swift to parse as, or `nil` for the
+  ///                   default.
+  ///   - experimentalFeatures: The experimental features to enable.
+  public init(
+    _ input: String,
+    maximumNestingLevel: Int? = nil,
+    parseTransition: IncrementalParseTransition? = nil,
+    swiftVersion: SwiftVersion? = nil,
+    experimentalFeatures: ExperimentalFeatures = []
   ) {
     var input = input
     input.makeContiguousUTF8()
@@ -303,45 +315,30 @@ public struct Parser {
     }
   }
 
-  /// Initializes a ``Parser`` from the given string.
-  public init(
-    _ input: String,
-    maximumNestingLevel: Int? = nil,
-    parseTransition: IncrementalParseTransition? = nil,
-    swiftVersion: SwiftVersion? = nil
-  ) {
-    // Chain to the private String initializer.
-    self.init(
-      string: input,
-      maximumNestingLevel: maximumNestingLevel,
-      parseTransition: parseTransition,
-      swiftVersion: swiftVersion,
-      experimentalFeatures: []
-    )
-  }
-
   /// Initializes a ``Parser`` from the given input buffer.
   ///
-  /// - Parameters
+  /// - Parameters:
   ///   - input: An input buffer containing Swift source text. It is copied into
   ///            a parser-owned buffer, so it can be freed after the initializer
   ///            has been called.
   ///   - maximumNestingLevel: To avoid overflowing the stack, the parser will
   ///                          stop if a nesting level greater than this value
-  ///                          is reached. The nesting level is increased
-  ///                          whenever a bracketed expression like `(` or `{`
-  ///                          is started. `defaultMaximumNestingLevel` is used
+  ///                          is reached. `defaultMaximumNestingLevel` is used
   ///                          if this is `nil`.
   ///   - parseTransition: The previously recorded state for an incremental
   ///                      parse, or `nil`.
+  ///   - swiftVersion: The version of Swift to parse as, or `nil` for the
+  ///                   default.
+  ///   - experimentalFeatures: The experimental features to enable.
   public init(
     _ input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
-    swiftVersion: SwiftVersion? = nil
+    swiftVersion: SwiftVersion? = nil,
+    experimentalFeatures: ExperimentalFeatures = []
   ) {
-    // Chain to the private buffer initializer. Copy the source so the caller may
-    // free `input` after this initializer returns.
+    // Copy the source so the caller may free `input` after this initializer
+    // returns.
     self.init(
       buffer: input,
       maximumNestingLevel: maximumNestingLevel,
@@ -349,44 +346,24 @@ public struct Parser {
       arena: nil,
       copySource: true,
       swiftVersion: swiftVersion,
-      experimentalFeatures: []
-    )
-  }
-
-  /// Initializes a ``Parser`` from the given input string, with a given set
-  /// of experimental language features.
-  @_spi(ExperimentalLanguageFeatures)
-  public init(
-    _ input: String,
-    maximumNestingLevel: Int? = nil,
-    parseTransition: IncrementalParseTransition? = nil,
-    swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures
-  ) {
-    // Chain to the private String initializer.
-    self.init(
-      string: input,
-      maximumNestingLevel: maximumNestingLevel,
-      parseTransition: parseTransition,
-      swiftVersion: swiftVersion,
       experimentalFeatures: experimentalFeatures
     )
   }
 
-  /// Initializes a ``Parser`` from the given input buffer, with a given set
-  /// of experimental language features.
-  @_spi(ExperimentalLanguageFeatures)
+  /// Initializes a ``Parser`` from the given input buffer, allocating the parsed
+  /// syntax into the given arena.
+  @_spi(RawSyntax)
   public init(
     _ input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
-    arena: ParsingRawSyntaxArena? = nil,
+    arena: ParsingRawSyntaxArena,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures
+    experimentalFeatures: ExperimentalFeatures = []
   ) {
-    // Chain to the private buffer initializer. Copy the source so the caller may
-    // free `input` after this initializer returns, and so the resulting tree
-    // does not depend on `input` (its tokens are interned into `arena`).
+    // Copy the source so the caller may free `input` after this initializer
+    // returns, and so the resulting tree does not depend on `input` (its tokens
+    // are interned into `arena`).
     self.init(
       buffer: input,
       maximumNestingLevel: maximumNestingLevel,
@@ -416,38 +393,8 @@ public struct Parser {
     source input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
-    body: (inout Parser) -> T
-  ) -> T {
-    return withParser(
-      source: input,
-      maximumNestingLevel: maximumNestingLevel,
-      parseTransition: parseTransition,
-      swiftVersion: nil,
-      experimentalFeatures: [],
-      body: body
-    )
-  }
-
-  /// Runs `body` with a `Parser` that lexes directly over `input` without
-  /// copying it into a parser-owned buffer, with a given Swift version and set
-  /// of experimental language features.
-  ///
-  /// This is the no-copy fast path: the entire parse runs inside this scope,
-  /// where `input` is guaranteed valid, and each token's text is interned into
-  /// the arena so the resulting tree is self-contained once `body` returns.
-  ///
-  /// - Important: `input` must remain valid for the entire duration of `body`.
-  ///   It is *not* referenced after `body` returns.
-  /// - Important: The `Parser` passed to `body` must not escape the closure. It
-  ///   lexes directly over `input`, so it is only valid within this scope.
-  @_spi(RawSyntax)
-  @_spi(ExperimentalLanguageFeatures)
-  public static func withParser<T>(
-    source input: UnsafeBufferPointer<UInt8>,
-    maximumNestingLevel: Int? = nil,
-    parseTransition: IncrementalParseTransition? = nil,
-    swiftVersion: SwiftVersion?,
-    experimentalFeatures: ExperimentalFeatures,
+    swiftVersion: SwiftVersion? = nil,
+    experimentalFeatures: ExperimentalFeatures = [],
     body: (inout Parser) -> T
   ) -> T {
     var parser = Parser(
@@ -462,8 +409,7 @@ public struct Parser {
     return body(&parser)
   }
 
-  /// Runs `body` with a no-copy `Parser` over the UTF-8 of `input`, with a given
-  /// Swift version and set of experimental language features.
+  /// Runs `body` with a no-copy `Parser` over the UTF-8 of `input`.
   ///
   /// The entire parse runs inside `String.withUTF8`, where the contiguous UTF-8
   /// storage is valid, so no copy of the source is needed.
@@ -471,13 +417,12 @@ public struct Parser {
   /// - Important: The `Parser` passed to `body` must not escape the closure. It
   ///   lexes directly over `input`, so it is only valid within this scope.
   @_spi(RawSyntax)
-  @_spi(ExperimentalLanguageFeatures)
   public static func withParser<T>(
     source input: String,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
-    swiftVersion: SwiftVersion?,
-    experimentalFeatures: ExperimentalFeatures,
+    swiftVersion: SwiftVersion? = nil,
+    experimentalFeatures: ExperimentalFeatures = [],
     body: (inout Parser) -> T
   ) -> T {
     var input = input

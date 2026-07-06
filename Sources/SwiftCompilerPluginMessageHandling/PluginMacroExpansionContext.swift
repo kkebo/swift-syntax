@@ -14,14 +14,14 @@
 internal import SwiftDiagnostics
 internal import SwiftIfConfig
 internal import SwiftOperators
-@_spi(ExperimentalLanguageFeatures) internal import SwiftParser
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) internal import SwiftParser
 internal import SwiftSyntax
 internal import SwiftSyntaxMacros
 #else
 import SwiftDiagnostics
 import SwiftIfConfig
 import SwiftOperators
-@_spi(ExperimentalLanguageFeatures) import SwiftParser
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
 #endif
