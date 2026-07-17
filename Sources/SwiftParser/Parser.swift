@@ -239,20 +239,23 @@ public struct Parser {
     self.arena = arena ?? ParsingRawSyntaxArena(parseTriviaFunction: TriviaParser.parseTrivia)
 
     var input = input
-    if copySource {
-      // Copy the source into a parser-owned buffer so the caller may free their
-      // buffer once this initializer returns. The buffer is freed when this
-      // `Parser` is destroyed (i.e. when the parse call returns); each token's
-      // text is interned into the arena at node-creation time, so the resulting
-      // tree does not reference this buffer.
+    if parseTransition == nil {
+      // Full parse: copy the whole source into the arena and lex over that copy,
+      // so parsed tokens point into arena-owned memory and need no per-token
+      // interning.
+      input = self.arena.internSourceBuffer(input)
+      self.sourceBufferOwner = nil
+    } else if copySource {
+      // Incremental reparse over a buffer that will not outlive this
+      // initializer: keep a parser-owned copy, freed when this `Parser` is
+      // destroyed. Each re-lexed token's text is interned into the arena.
       let owner = ParserSourceBufferOwner(copying: input)
       self.sourceBufferOwner = owner
       input = owner.buffer
     } else {
-      // No-copy: lex directly over the caller-provided buffer. The caller
-      // guarantees it stays valid for the entire parse (see `withParser`). Each
-      // token's text is interned into the arena, so the tree is self-contained
-      // and does not reference the buffer after parsing.
+      // Incremental reparse over the caller-provided buffer, which the caller
+      // guarantees stays valid for the parse (see `withParser`). Each re-lexed
+      // token's text is interned into the arena.
       self.sourceBufferOwner = nil
     }
 
