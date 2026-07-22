@@ -68,7 +68,7 @@ extension Parser {
     case (.do, let handle)?:
       // If we have 'do' expressions enabled, we parse a DoExprSyntax, and wrap
       // it in an ExpressionStmtSyntax.
-      if self.experimentalFeatures.contains(.doExpressions) {
+      if self.languageFeatures.contains(.doExpressions) {
         let doExpr = self.parseDoExpression(doHandle: handle)
         let doStmt = RawExpressionStmtSyntax(
           expression: doExpr,
@@ -179,7 +179,7 @@ extension Parser {
   }
 
   mutating func atConditionListTerminator(isGuardStatement: Bool) -> Bool {
-    guard experimentalFeatures.contains(.trailingComma) else {
+    guard languageFeatures.contains(.trailingComma) else {
       return false
     }
     // Condition terminator is `else` for `guard` statements.
@@ -559,7 +559,7 @@ extension Parser {
     let unsafeKeyword: RawTokenSyntax?
     if let modifierKeyword = ExpressionModifierKeyword(
       lexeme: self.currentToken,
-      experimentalFeatures: self.experimentalFeatures
+      languageFeatures: self.languageFeatures
     ), modifierKeyword == .unsafe, !self.peek(isAt: .keyword(.in), .colon) {
       unsafeKeyword = self.expectWithoutRecovery(.keyword(.unsafe))
     } else {
@@ -649,7 +649,7 @@ extension Parser {
       case poundElseif
       case endOfFile
 
-      init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+      init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
         switch PrepareForKeywordMatch(lexeme) {
         case TokenSpec(.rightBrace): self = .rightBrace
         case TokenSpec(.case): self = .case
@@ -785,7 +785,7 @@ extension Parser {
 extension Parser {
   /// Parse a `then` statement.
   mutating func parseThenStatement(handle: RecoveryConsumptionHandle) -> RawStmtSyntax {
-    assert(experimentalFeatures.contains(.thenStatements))
+    assert(languageFeatures.contains(.thenStatements))
 
     let (unexpectedBeforeThen, then) = self.eat(handle)
     let hasMisplacedTry = unexpectedBeforeThen?.containsToken(where: { TokenSpec(.try) ~= $0 }) ?? false
@@ -937,7 +937,7 @@ extension TokenConsumer {
         return true
       case .if, .switch:
         return true
-      case .do where self.experimentalFeatures.contains(.doExpressions):
+      case .do where self.languageFeatures.contains(.doExpressions):
         return true
 
       default:

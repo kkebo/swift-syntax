@@ -18,7 +18,7 @@ extension Parser {
   /// the individual features are `@_spi(ExperimentalLanguageFeatures)` since
   /// they are unstable. Clients that don't enable experimental features only
   /// ever use the empty set.
-  public struct ExperimentalFeatures: OptionSet, Hashable, Sendable {
+  public struct LanguageFeatures: OptionSet, Hashable, Sendable {
     public let rawValue: UInt
 
     public init(rawValue: UInt) {
@@ -27,7 +27,7 @@ extension Parser {
   }
 }
 
-extension Parser.ExperimentalFeatures {
+extension Parser.LanguageFeatures {
   /// Whether to enable the parsing of reference bindings.
   @_spi(ExperimentalLanguageFeatures)
   public static let referenceBindings = Self (rawValue: 1 << 0)

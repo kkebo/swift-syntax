@@ -15,7 +15,7 @@ import SwiftSyntaxBuilder
 import SyntaxSupport
 import Utils
 
-let experimentalFeaturesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
+let languageFeaturesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
   DeclSyntax(
     """
     extension Parser {
@@ -23,7 +23,7 @@ let experimentalFeaturesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) 
       /// the individual features are `@_spi(ExperimentalLanguageFeatures)` since
       /// they are unstable. Clients that don't enable experimental features only
       /// ever use the empty set.
-      public struct ExperimentalFeatures: OptionSet, Hashable, Sendable {
+      public struct LanguageFeatures: OptionSet, Hashable, Sendable {
         public let rawValue: UInt
         public init(rawValue: UInt) {
           self.rawValue = rawValue
@@ -33,7 +33,7 @@ let experimentalFeaturesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) 
     """
   )
 
-  try! ExtensionDeclSyntax("extension Parser.ExperimentalFeatures") {
+  try! ExtensionDeclSyntax("extension Parser.LanguageFeatures") {
     for (i, feature) in ExperimentalFeature.allCases.enumerated() {
       DeclSyntax(
         """

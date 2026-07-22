@@ -324,7 +324,7 @@ extension Parser {
       case leftSquare
       case wildcard
 
-      init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+      init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
         switch PrepareForKeywordMatch(lexeme) {
         case .keyword(.Self): self = .Self
         case .keyword(.Any): self = .Any
@@ -858,7 +858,7 @@ extension Parser.Lookahead {
     }
 
     // When LiteralExpressions is enabled, try parsing a parenthesized expression
-    if self.experimentalFeatures.contains(.literalExpressions) && self.at(.leftParen)
+    if self.languageFeatures.contains(.literalExpressions) && self.at(.leftParen)
       && self.withLookahead({
         $0.skipSingle()
         return $0.at(.comma, TokenSpec(.of, allowAtStartOfLine: false)) || $0.at(prefix: ">")
@@ -1382,7 +1382,7 @@ extension Parser {
       if let (_, specifierHandle) = self.at(anyIn: SimpleTypeSpecifierSyntax.SpecifierOptions.self) {
         specifiers.append(parseSimpleTypeSpecifier(specifierHandle: specifierHandle))
       } else if self.at(.keyword(.dependsOn)) {
-        if self.experimentalFeatures.contains(.nonescapableTypes) {
+        if self.languageFeatures.contains(.nonescapableTypes) {
           specifiers.append(parseLifetimeTypeSpecifier())
         } else {
           break SPECIFIER_PARSING

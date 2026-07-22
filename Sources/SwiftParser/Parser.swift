@@ -131,7 +131,7 @@ public struct Parser {
   let swiftVersion: SwiftVersion
 
   /// The experimental features that have been enabled.
-  let experimentalFeatures: ExperimentalFeatures
+  let languageFeatures: LanguageFeatures
 
   /// A default maximum nesting level that is used if the client didn't
   /// explicitly specify one. Debug builds of the parser consume a lot more stack
@@ -226,7 +226,7 @@ public struct Parser {
   ///                 only read while lexing, which happens during that lifetime).
   ///  - swiftVersion: The version of Swift using which the file should be parsed.
   ///                  Defaults to the latest version.
-  ///  - experimentalFeatures: The experimental features enabled for the parser.
+  ///  - languageFeatures: The experimental features enabled for the parser.
   private init(
     buffer input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int?,
@@ -234,7 +234,7 @@ public struct Parser {
     arena: ParsingRawSyntaxArena?,
     copySource: Bool,
     swiftVersion: SwiftVersion?,
-    experimentalFeatures: ExperimentalFeatures
+    languageFeatures: LanguageFeatures
   ) {
     self.arena = arena ?? ParsingRawSyntaxArena(parseTriviaFunction: TriviaParser.parseTrivia)
 
@@ -261,13 +261,13 @@ public struct Parser {
 
     self.maximumNestingLevel = maximumNestingLevel ?? Self.defaultMaximumNestingLevel
     self.swiftVersion = swiftVersion ?? Self.defaultSwiftVersion
-    self.experimentalFeatures = experimentalFeatures
+    self.languageFeatures = languageFeatures
     self.lookaheadTrackerOwner = LookaheadTrackerOwner()
 
     self.lexemes = Lexer.tokenize(
       input,
       lookaheadTracker: lookaheadTrackerOwner.lookaheadTracker,
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     )
     self.currentToken = self.lexemes.advance()
     if let parseTransition {
@@ -289,13 +289,13 @@ public struct Parser {
   ///                      parse, or `nil`.
   ///   - swiftVersion: The version of Swift to parse as, or `nil` for the
   ///                   default.
-  ///   - experimentalFeatures: The experimental features to enable.
+  ///   - languageFeatures: The experimental features to enable.
   public init(
     _ input: String,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = []
+    languageFeatures: LanguageFeatures = []
   ) {
     var input = input
     input.makeContiguousUTF8()
@@ -310,7 +310,7 @@ public struct Parser {
         // copied into a parser-owned buffer.
         copySource: true,
         swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures
+        languageFeatures: languageFeatures
       )
     }
   }
@@ -329,13 +329,13 @@ public struct Parser {
   ///                      parse, or `nil`.
   ///   - swiftVersion: The version of Swift to parse as, or `nil` for the
   ///                   default.
-  ///   - experimentalFeatures: The experimental features to enable.
+  ///   - languageFeatures: The experimental features to enable.
   public init(
     _ input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = []
+    languageFeatures: LanguageFeatures = []
   ) {
     // Copy the source so the caller may free `input` after this initializer
     // returns.
@@ -346,7 +346,7 @@ public struct Parser {
       arena: nil,
       copySource: true,
       swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     )
   }
 
@@ -359,7 +359,7 @@ public struct Parser {
     parseTransition: IncrementalParseTransition? = nil,
     arena: ParsingRawSyntaxArena,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = []
+    languageFeatures: LanguageFeatures = []
   ) {
     // Copy the source so the caller may free `input` after this initializer
     // returns, and so the resulting tree does not depend on `input` (its tokens
@@ -371,7 +371,7 @@ public struct Parser {
       arena: arena,
       copySource: true,
       swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     )
   }
 
@@ -394,7 +394,7 @@ public struct Parser {
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = [],
+    languageFeatures: LanguageFeatures = [],
     body: (inout Parser) -> T
   ) -> T {
     var parser = Parser(
@@ -404,7 +404,7 @@ public struct Parser {
       arena: nil,
       copySource: false,
       swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     )
     return body(&parser)
   }
@@ -422,7 +422,7 @@ public struct Parser {
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = [],
+    languageFeatures: LanguageFeatures = [],
     body: (inout Parser) -> T
   ) -> T {
     var input = input
@@ -433,7 +433,7 @@ public struct Parser {
         maximumNestingLevel: maximumNestingLevel,
         parseTransition: parseTransition,
         swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
+        languageFeatures: languageFeatures,
         body: body
       )
     }

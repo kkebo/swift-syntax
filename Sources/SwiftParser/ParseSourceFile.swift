@@ -23,14 +23,14 @@ extension Parser {
     source: String,
     maximumNestingLevel: Int? = nil,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = []
+    languageFeatures: LanguageFeatures = []
   ) -> SourceFileSyntax {
     return withParser(
       source: source,
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: nil,
       swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     ) { SourceFileSyntax.parse(from: &$0) }
   }
 
@@ -40,14 +40,14 @@ extension Parser {
     source: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     swiftVersion: SwiftVersion? = nil,
-    experimentalFeatures: ExperimentalFeatures = []
+    languageFeatures: LanguageFeatures = []
   ) -> SourceFileSyntax {
     return withParser(
       source: source,
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: nil,
       swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     ) { SourceFileSyntax.parse(from: &$0) }
   }
 
@@ -131,7 +131,7 @@ extension Parser {
       maximumNestingLevel: nil,
       parseTransition: parseTransition,
       swiftVersion: nil,
-      experimentalFeatures: []
+      languageFeatures: []
     ) { IncrementalParseResult(tree: SourceFileSyntax.parse(from: &$0), lookaheadRanges: $0.lookaheadRanges) }
   }
 
@@ -150,7 +150,7 @@ extension Parser {
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: parseTransition,
       swiftVersion: nil,
-      experimentalFeatures: []
+      languageFeatures: []
     ) { IncrementalParseResult(tree: SourceFileSyntax.parse(from: &$0), lookaheadRanges: $0.lookaheadRanges) }
   }
 }

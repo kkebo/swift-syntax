@@ -25,7 +25,7 @@ protocol TokenConsumer {
   var swiftVersion: Parser.SwiftVersion { get }
 
   /// The experimental features that have been enabled.
-  var experimentalFeatures: Parser.ExperimentalFeatures { get }
+  var languageFeatures: Parser.LanguageFeatures { get }
 
   /// Whether the current token matches the given kind.
   mutating func consumeAnyToken() -> Token
@@ -146,7 +146,7 @@ extension TokenConsumer {
       recordAlternativeTokenChoice(for: self.currentToken, choices: specSet.allCases.map(\.spec))
     }
     #endif
-    if let matchedKind = SpecSet(lexeme: self.currentToken, experimentalFeatures: self.experimentalFeatures) {
+    if let matchedKind = SpecSet(lexeme: self.currentToken, languageFeatures: self.languageFeatures) {
       precondition(matchedKind.spec ~= self.currentToken)
       return (
         matchedKind,
@@ -160,7 +160,7 @@ extension TokenConsumer {
   /// If this is the case, return the corresponding `SpecSet` case.
   @inline(__always)
   func peek<SpecSet: TokenSpecSet>(isAtAnyIn specSet: SpecSet.Type) -> SpecSet? {
-    guard let matchedKind = SpecSet(lexeme: self.peek(), experimentalFeatures: self.experimentalFeatures) else {
+    guard let matchedKind = SpecSet(lexeme: self.peek(), languageFeatures: self.languageFeatures) else {
       return nil
     }
     precondition(matchedKind.spec ~= self.peek())

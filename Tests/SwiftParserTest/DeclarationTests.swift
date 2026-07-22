@@ -3382,7 +3382,7 @@ final class DeclarationTests: ParserTestCase {
   func testInitializerWithReturnType() {
     assertParse(
       "init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> dependsOn(a) Self",
-      experimentalFeatures: .nonescapableTypes
+      languageFeatures: .nonescapableTypes
     )
 
     // Not actually valid, needs to be diagnosed during type checking
@@ -3474,7 +3474,7 @@ final class DeclarationTests: ParserTestCase {
         }
       }
       """,
-      experimentalFeatures: .coroutineAccessors
+      languageFeatures: .coroutineAccessors
     )
     assertParse(
       """
@@ -3493,7 +3493,7 @@ final class DeclarationTests: ParserTestCase {
         }
       }
       """,
-      experimentalFeatures: .coroutineAccessors
+      languageFeatures: .coroutineAccessors
     )
     assertParse(
       """
@@ -3676,7 +3676,7 @@ final class DeclarationTests: ParserTestCase {
 }
 
 final class UsingDeclarationTests: ParserTestCase {
-  override var experimentalFeatures: Parser.ExperimentalFeatures {
+  override var languageFeatures: Parser.LanguageFeatures {
     [.defaultIsolationPerFile]
   }
 

@@ -90,7 +90,7 @@ extension Parser {
     case Sendable
     case transpose
 
-    init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+    init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
       switch PrepareForKeywordMatch(lexeme) {
       case TokenSpec(._backDeploy): self = ._backDeploy
       case TokenSpec(._documentation): self = ._documentation
@@ -1053,7 +1053,7 @@ extension Parser {
             }
           }
 
-          init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+          init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
             switch PrepareForKeywordMatch(lexeme) {
             case TokenSpec(.private): self = .private
             case TokenSpec(.fileprivate): self = .fileprivate

@@ -21,7 +21,7 @@ func tokenCaseMatch(
 ) -> SwitchCaseSyntax {
   var whereClause = ""
   if let feature = experimentalFeature {
-    whereClause += "where experimentalFeatures.contains(.\(feature.token))"
+    whereClause += "where languageFeatures.contains(.\(feature.token))"
   }
   return "case TokenSpec(.\(enumCaseCallName))\(raw: whereClause): self = .\(enumCaseCallName)"
 }
@@ -54,7 +54,7 @@ let parserTokenSpecSetFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
             }
 
             try InitializerDeclSyntax(
-              "init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures)"
+              "init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures)"
             ) {
               try SwitchExprSyntax("switch PrepareForKeywordMatch(lexeme)") {
                 for choice in choices {

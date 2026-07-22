@@ -413,7 +413,7 @@ public class WarningGroupControlTests: XCTestCase {
       using @diagnose(GroupID, as: error)
       3️⃣let k = 1
       """,
-      experimentalFeatures: [.defaultIsolationPerFile],
+      languageFeatures: [.defaultIsolationPerFile],
       diagnosticGroupID: "GroupID",
       states: [
         "0️⃣": .error,
@@ -440,7 +440,7 @@ public class WarningGroupControlTests: XCTestCase {
       }
 
       """,
-      experimentalFeatures: [.defaultIsolationPerFile],
+      languageFeatures: [.defaultIsolationPerFile],
       diagnosticGroupID: "GroupID",
       states: [
         "0️⃣": .none,
@@ -748,7 +748,7 @@ private func assertWarningGroupControl(
   customConditions: Set<String> = [],
   globalControls: [(DiagnosticGroupIdentifier, WarningGroupControl)] = [],
   groupInheritanceTree: DiagnosticGroupInheritanceTree? = nil,
-  experimentalFeatures: Parser.ExperimentalFeatures? = nil,
+  languageFeatures: Parser.LanguageFeatures? = nil,
   diagnosticGroupID: DiagnosticGroupIdentifier,
   states: [String: WarningGroupControl?],
   file: StaticString = #filePath,
@@ -756,8 +756,8 @@ private func assertWarningGroupControl(
 ) throws {
   // Pull out the markers that we'll use to dig out nodes to query.
   let (markerLocations, source) = extractMarkers(markedSource)
-  let experimentalFeatures = experimentalFeatures ?? []
-  var parser = Parser(source, experimentalFeatures: experimentalFeatures)
+  let languageFeatures = languageFeatures ?? []
+  var parser = Parser(source, languageFeatures: languageFeatures)
   let tree = SourceFileSyntax.parse(from: &parser)
   let buildConfig = StaticBuildConfiguration(
     customConditions: customConditions,
