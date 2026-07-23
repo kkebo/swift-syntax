@@ -36,18 +36,18 @@ extension Parser {
 
     /// The experimental features that have been enabled in the underlying
     /// parser.
-    let experimentalFeatures: ExperimentalFeatures
+    let languageFeatures: LanguageFeatures
 
     private init(
       lexemes: Lexer.LexemeSequence,
       currentToken: Lexer.Lexeme,
       swiftVersion: SwiftVersion,
-      experimentalFeatures: ExperimentalFeatures
+      languageFeatures: LanguageFeatures
     ) {
       self.lexemes = lexemes
       self.currentToken = currentToken
       self.swiftVersion = swiftVersion
-      self.experimentalFeatures = experimentalFeatures
+      self.languageFeatures = languageFeatures
     }
 
     fileprivate init(cloning other: Parser) {
@@ -55,7 +55,7 @@ extension Parser {
         lexemes: other.lexemes,
         currentToken: other.currentToken,
         swiftVersion: other.swiftVersion,
-        experimentalFeatures: other.experimentalFeatures
+        languageFeatures: other.languageFeatures
       )
     }
 
@@ -66,7 +66,7 @@ extension Parser {
         lexemes: self.lexemes,
         currentToken: self.currentToken,
         swiftVersion: self.swiftVersion,
-        experimentalFeatures: self.experimentalFeatures
+        languageFeatures: self.languageFeatures
       )
     }
   }
@@ -341,7 +341,7 @@ extension Parser.Lookahead {
     case poundElse
     case poundElseif
 
-    init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+    init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
       switch lexeme.rawTokenKind {
       case .leftParen: self = .leftParen
       case .leftBrace: self = .leftBrace

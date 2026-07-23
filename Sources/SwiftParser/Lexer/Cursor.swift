@@ -255,7 +255,7 @@ extension Lexer {
     }
     var position: Position
 
-    var experimentalFeatures: Parser.ExperimentalFeatures
+    var languageFeatures: Parser.LanguageFeatures
 
     /// If we have already lexed a token, the kind of the previously lexed token
     var previousTokenKind: RawTokenKind?
@@ -269,9 +269,9 @@ extension Lexer {
 
     private var stateStack: StateStack = StateStack()
 
-    init(input: UnsafeBufferPointer<UInt8>, previous: UInt8, experimentalFeatures: Parser.ExperimentalFeatures) {
+    init(input: UnsafeBufferPointer<UInt8>, previous: UInt8, languageFeatures: Parser.LanguageFeatures) {
       self.position = Position(input: input, previous: previous)
-      self.experimentalFeatures = experimentalFeatures
+      self.languageFeatures = languageFeatures
     }
 
     /// Returns `true` if this cursor is sufficiently different to `other` in a way that indicates that the lexer has
@@ -2521,7 +2521,7 @@ extension Lexer.Cursor {
       return false
     }
 
-    guard let end = Self.findConflictEnd(start, markerKind: kind, experimentalFeatures: experimentalFeatures) else {
+    guard let end = Self.findConflictEnd(start, markerKind: kind, languageFeatures: languageFeatures) else {
       // No end of conflict marker found.
       return false
     }
@@ -2540,7 +2540,7 @@ extension Lexer.Cursor {
   static func findConflictEnd(
     _ curPtr: Lexer.Cursor,
     markerKind: ConflictMarker,
-    experimentalFeatures: Parser.ExperimentalFeatures
+    languageFeatures: Parser.LanguageFeatures
   ) -> Lexer.Cursor? {
     // Get a reference to the rest of the buffer minus the length of the start
     // of the conflict marker.
@@ -2548,7 +2548,7 @@ extension Lexer.Cursor {
     var restOfBuffer = Lexer.Cursor(
       input: .init(start: advanced, count: curPtr.input.count - markerKind.introducer.count),
       previous: curPtr.input[markerKind.introducer.count - 1],
-      experimentalFeatures: experimentalFeatures
+      languageFeatures: languageFeatures
     )
     let terminator = markerKind.terminator
     let terminatorStart = terminator.first!
@@ -2570,7 +2570,7 @@ extension Lexer.Cursor {
       return Lexer.Cursor(
         input: .init(start: advanced, count: restOfBuffer.input.count - terminator.count),
         previous: restOfBuffer.input[terminator.count - 1],
-        experimentalFeatures: experimentalFeatures
+        languageFeatures: languageFeatures
       )
     }
     return nil

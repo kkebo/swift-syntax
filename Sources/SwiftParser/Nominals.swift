@@ -340,7 +340,7 @@ extension Parser {
   }
 
   mutating func atInheritanceListTerminator() -> Bool {
-    return self.experimentalFeatures.contains(.trailingComma) && (self.at(.leftBrace) || self.at(.keyword(.where)))
+    return self.languageFeatures.contains(.trailingComma) && (self.at(.leftBrace) || self.at(.keyword(.where)))
   }
 
   mutating func parsePrimaryAssociatedTypes() -> RawPrimaryAssociatedTypeClauseSyntax {

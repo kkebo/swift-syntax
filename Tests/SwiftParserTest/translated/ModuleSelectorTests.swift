@@ -1794,7 +1794,7 @@ final class ModuleSelectorTests: ParserTestCase {
           CodeBlockItemSyntax(item: .expr(ExprSyntax(IntegerLiteralExprSyntax(integerLiteral: 1))))
         }
       ),
-      experimentalFeatures: [.doExpressions]
+      languageFeatures: [.doExpressions]
     )
     assertParse(
       """
@@ -1808,7 +1808,7 @@ final class ModuleSelectorTests: ParserTestCase {
         let x = Swift::<#identifier#>
         do { 1 }
         """,
-      experimentalFeatures: [.doExpressions]
+      languageFeatures: [.doExpressions]
     )
     assertParse(
       "let x = Swift::if1️⃣ y { 1 } 2️⃣else { 0 }",

@@ -47,7 +47,7 @@ extension Parser {
     let shebang: RawTokenSyntax?
     let items: RawCodeBlockItemListSyntax
 
-    if !self.experimentalFeatures.contains(._test_EverythingUnexpected) {
+    if !self.languageFeatures.contains(._test_EverythingUnexpected) {
       shebang = self.consume(if: .shebang)
       items = self.parseTopLevelCodeBlockItems()
     } else {

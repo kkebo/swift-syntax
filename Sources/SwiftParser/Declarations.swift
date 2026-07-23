@@ -791,7 +791,7 @@ extension Parser {
             case postfixOperator
             case prefixOperator
 
-            init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+            init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
               switch (lexeme.rawTokenKind, lexeme.tokenText) {
               case (.colon, _): self = .colon
               case (.binaryOperator, "=="): self = .binaryOperator
@@ -2083,7 +2083,7 @@ extension Parser {
       case higherThan
       case lowerThan
 
-      init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+      init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
         switch PrepareForKeywordMatch(lexeme) {
         case TokenSpec(.associativity): self = .associativity
         case TokenSpec(.assignment): self = .assignment

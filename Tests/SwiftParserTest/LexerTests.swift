@@ -22,7 +22,7 @@ private func lex(_ sourceBytes: [UInt8], body: ([Lexer.Lexeme]) throws -> Void) 
   lookaheadTracker.initialize(to: LookaheadTracker())
   try sourceBytes.withUnsafeBufferPointer { (buf) in
     var lexemes = [Lexer.Lexeme]()
-    for token in Lexer.tokenize(buf, from: 0, lookaheadTracker: lookaheadTracker, experimentalFeatures: []) {
+    for token in Lexer.tokenize(buf, from: 0, lookaheadTracker: lookaheadTracker, languageFeatures: []) {
       lexemes.append(token)
 
       if token.rawTokenKind == .endOfFile {

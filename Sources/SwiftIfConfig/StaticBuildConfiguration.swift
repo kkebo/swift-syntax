@@ -450,10 +450,10 @@ extension StaticBuildConfiguration {
   /// Determine the set of experimental features that are enabled by this
   /// static build configuration.
   @_spi(ExperimentalLanguageFeatures)
-  public var experimentalFeatures: Parser.ExperimentalFeatures {
-    var result: Parser.ExperimentalFeatures = []
+  public var parserLanguageFeatures: Parser.LanguageFeatures {
+    var result: Parser.LanguageFeatures = []
     for feature in features {
-      if let experimentalFeature = Parser.ExperimentalFeatures(name: feature) {
+      if let experimentalFeature = Parser.LanguageFeatures(name: feature) {
         result.insert(experimentalFeature)
       }
     }

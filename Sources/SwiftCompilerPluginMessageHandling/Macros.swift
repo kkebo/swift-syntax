@@ -41,7 +41,7 @@ extension PluginProviderMessageHandler {
     _ lexicalContext: [PluginMessage.Syntax]?,
     sourceManager: SourceManager,
     swiftVersion: Parser.SwiftVersion?,
-    experimentalFeatures: Parser.ExperimentalFeatures?,
+    languageFeatures: Parser.LanguageFeatures?,
     operatorTable: OperatorTable,
     fallbackSyntax: some SyntaxProtocol
   ) -> [Syntax] {
@@ -55,7 +55,7 @@ extension PluginProviderMessageHandler {
       sourceManager.add(
         $0,
         swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
+        languageFeatures: languageFeatures,
         foldingWith: operatorTable
       )
     }
@@ -72,11 +72,11 @@ extension PluginProviderMessageHandler {
   ) -> PluginToHostMessage {
     let sourceManager = SourceManager(syntaxRegistry: syntaxRegistry)
     let swiftVersion = staticBuildConfiguration?.parserSwiftVersion
-    let experimentalFeatures = staticBuildConfiguration?.experimentalFeatures
+    let languageFeatures = staticBuildConfiguration?.parserLanguageFeatures
     let syntax = sourceManager.add(
       expandingSyntax,
       swiftVersion: swiftVersion,
-      experimentalFeatures: experimentalFeatures,
+      languageFeatures: languageFeatures,
       foldingWith: .standardOperators
     )
 
@@ -86,7 +86,7 @@ extension PluginProviderMessageHandler {
         lexicalContext,
         sourceManager: sourceManager,
         swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
+        languageFeatures: languageFeatures,
         operatorTable: .standardOperators,
         fallbackSyntax: syntax
       ),
@@ -147,13 +147,13 @@ extension PluginProviderMessageHandler {
   ) -> PluginToHostMessage {
     let sourceManager = SourceManager(syntaxRegistry: syntaxRegistry)
     let swiftVersion = staticBuildConfiguration?.parserSwiftVersion
-    let experimentalFeatures = staticBuildConfiguration?.experimentalFeatures
+    let languageFeatures = staticBuildConfiguration?.parserLanguageFeatures
 
     func addToSourceManager(_ syntax: PluginMessage.Syntax, foldOperators: Bool) -> Syntax {
       sourceManager.add(
         syntax,
         swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
+        languageFeatures: languageFeatures,
         foldingWith: foldOperators ? .standardOperators : nil
       )
     }
@@ -178,7 +178,7 @@ extension PluginProviderMessageHandler {
         lexicalContext,
         sourceManager: sourceManager,
         swiftVersion: swiftVersion,
-        experimentalFeatures: experimentalFeatures,
+        languageFeatures: languageFeatures,
         operatorTable: .standardOperators,
         fallbackSyntax: declarationNode
       ),

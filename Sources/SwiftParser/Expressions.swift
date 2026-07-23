@@ -269,7 +269,7 @@ extension Parser {
       case arrow
       case `throws`
 
-      init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+      init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
         switch PrepareForKeywordMatch(lexeme) {
         case TokenSpec(.binaryOperator): self = .binaryOperator
         case TokenSpec(.infixQuestionMark): self = .infixQuestionMark
@@ -499,7 +499,7 @@ extension Parser {
       )
 
     case (._borrow, let handle)?:
-      assert(self.experimentalFeatures.contains(.oldOwnershipOperatorSpellings))
+      assert(self.languageFeatures.contains(.oldOwnershipOperatorSpellings))
       fallthrough
     case (.borrow, let handle)?:
       if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) {
@@ -537,7 +537,7 @@ extension Parser {
       )
 
     case (._move, let handle)?:
-      assert(self.experimentalFeatures.contains(.oldOwnershipOperatorSpellings))
+      assert(self.languageFeatures.contains(.oldOwnershipOperatorSpellings))
       fallthrough
     case (.consume, let handle)?:
       if !atContextualKeywordPrefixedSyntax(exprFlavor: flavor) {
@@ -1200,7 +1200,7 @@ extension Parser {
         )
 
         // If fully applied method component, parse as a keypath method.
-        if self.experimentalFeatures.contains(.keypathWithMethodMembers)
+        if self.languageFeatures.contains(.keypathWithMethodMembers)
           && self.at(.leftParen)
         {
           var (unexpectedBeforeLParen, leftParen) = self.expect(.leftParen)
@@ -2344,7 +2344,7 @@ extension Parser.Lookahead {
 extension Parser {
   /// Parse a do expression.
   mutating func parseDoExpression(doHandle: RecoveryConsumptionHandle) -> RawDoExprSyntax {
-    precondition(experimentalFeatures.contains(.doExpressions))
+    precondition(languageFeatures.contains(.doExpressions))
     let (unexpectedBeforeDoKeyword, doKeyword) = self.eat(doHandle)
     let body = self.parseCodeBlock(introducer: doKeyword)
 
@@ -2655,7 +2655,7 @@ extension Parser {
   }
 
   mutating func atSwitchCaseListTerminator() -> Bool {
-    return self.experimentalFeatures.contains(.trailingComma) && self.at(.colon)
+    return self.languageFeatures.contains(.trailingComma) && self.at(.colon)
   }
 
   /// Parse a switch case with a 'default' label.

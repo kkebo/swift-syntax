@@ -90,7 +90,7 @@ extension Parser {
         (.declarationModifier(._local), let handle)?,
         (.declarationModifier(.__setter_access), let handle)?,
         (.declarationModifier(.reasync), let handle)?
-      where experimentalFeatures.contains(.nonescapableTypes):
+      where languageFeatures.contains(.nonescapableTypes):
         let (unexpectedBeforeKeyword, keyword) = self.eat(handle)
         elements.append(RawDeclModifierSyntax(unexpectedBeforeKeyword, name: keyword, detail: nil, arena: self.arena))
       case (.declarationModifier(.rethrows), _)?:
@@ -181,7 +181,7 @@ extension Parser {
         }
       }
 
-      init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+      init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
         switch PrepareForKeywordMatch(lexeme) {
         case TokenSpec(.private): self = .private
         case TokenSpec(.fileprivate): self = .fileprivate

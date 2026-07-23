@@ -34,7 +34,7 @@ extension Parser {
       }
     }
 
-    init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
+    init?(lexeme: Lexer.Lexeme, languageFeatures: Parser.LanguageFeatures) {
       switch PrepareForKeywordMatch(lexeme) {
       case TokenSpec(.poundElseif): self = .poundElseif
       case TokenSpec(.poundElse): self = .poundElse

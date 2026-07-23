@@ -27,7 +27,7 @@ public struct TriviaParser {
       input: UnsafeBufferPointer(start: source.baseAddress, count: source.count),
       previous: 0,
       // There are currently no experimental features that affect trivia parsing.
-      experimentalFeatures: []
+      languageFeatures: []
     )
 
     while true {
