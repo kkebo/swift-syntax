@@ -10,68 +10,107 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TODO: Remove Glibc import
-@preconcurrency import Glibc
 import SwiftIfConfig
 import SwiftSyntax
 
-// TODO: Add .lookForSupertype, .lookForDynamicMember & implemenet internal/external module lookup
+/// The symbol table drives lookup. Given a collection of files, their modules,
+/// and the build configuration, it can resolve type syntax by correctly
+/// tracking types and their extensions.
 @_spi(_QualifiedLookupTests)
 public final class SymbolTable {
-  /// Invariant: moduleToSources[moduleName] != nil
+  /// The "internal" module.
   public let moduleName: ModuleName
+  /// Invariants:
+  /// 1. moduleToSources[moduleName] != nil
+  /// 2. Each `SourceFileSyntax` is unique (across modules)
   public let moduleToSources: [ModuleName: [String: SourceFileSyntax]]
+  /// The build configuration used for lookups in the symbol table's files.
   public let buildConfiguration: (any BuildConfiguration)?
-
-  // private let _fileToConfiguredRegions: [SourceFileSyntax: ConfiguredRegions?]
-  enum NonRegisteredFileFailure: Error {
-    case unregisteredFileRoot
-  }
-  func getConfiguredRegions(
-    forFile fileSyntax: SourceFileSyntax
-  ) -> Result<ConfiguredRegions?, NonRegisteredFileFailure> {
-    guard fileMap[fileSyntax] != nil else { return .failure(.unregisteredFileRoot) }
-    guard let buildConfiguration else { return .success(nil) }
-    let configuredRegions = fileSyntax.configuredRegions(in: buildConfiguration)
-    return .success(configuredRegions)
-  }
-
-  let _verbose: Bool = false
-  let _logNestingLimit: Int? = nil
-  var logPrefix = [String]()
+  /// Useful map for finding a file's name, configured regions and module in constant time.
+  private let fileToInfo: [SourceFileSyntax: FileInfo]
 
   // Tracks requested extensions for extension binding
   var requestedExtensions: [Attached<ExtensionDeclSyntax>] = []
-
-  /// TODO: Consider merging maps below
+  // TODO: Setters should be private
   //
-  /// Useful map for finding the module of a file in constant time.
-  private(set) lazy var moduleMap: [SourceFileSyntax: ModuleName] = _generateModuleMap()
-  /// Useful map for finding file identifiers in constant time.
-  /// E.g. `File.swift`, `Helpers/File.swift`
-  private(set) lazy var fileMap: [SourceFileSyntax: String] = _generateFileMap()
+  /// The extensions that have not yet been admitted to the type graph.
+  public internal(set) lazy var unresolvedExtensions = [Attached<ExtensionDeclSyntax>]()
+  /// A graph that keeps tracks of types and their extensions.
+  public internal(set) var typeGraph = TypeGraph()
 
+  // Logging/debug properties
+  let _verbose: Bool = false
+  let _logNestingLimit: Int? = nil
+  var logPrefix = [String]()
   /// `DebugFileMap` only has a runtime impact in DEBUG builds.
   internal lazy var debugFileMap: DebugFileMap = _generateDebugFileMap()
 
-  // TODO: Setters should be private
-  @_spi(_QualifiedLookupTests)
-  public internal(set) lazy var unresolvedExtensions = [ExtensionDeclSyntax]()
-  @_spi(_QualifiedLookupTests)
-  public internal(set) var typeGraph = TypeGraph()
+  private init(
+    moduleName: ModuleName,
+    moduleToSources: [ModuleName: [String: SourceFileSyntax]],
+    buildConfiguration: (any BuildConfiguration)?,
+    fileToInfo: [SourceFileSyntax: FileInfo]
+  ) {
+    self.moduleName = moduleName
+    self.moduleToSources = moduleToSources
+    self.buildConfiguration = buildConfiguration
+    self.fileToInfo = fileToInfo
+  }
+}
 
-  public init?(
+extension SymbolTable {
+  public convenience init?(
     moduleName: ModuleName,
     moduleToSources: [ModuleName: [String: SourceFileSyntax]],
     buildConfiguration: (any BuildConfiguration)?
   ) {
+    // Uphold invariant that `moduleToSources[moduleName] != nil`
     guard moduleToSources[moduleName] != nil else { return nil }
 
-    self.moduleName = moduleName
-    self.moduleToSources = moduleToSources
-    self.buildConfiguration = buildConfiguration
-  }
+    var fileToInfo = [SourceFileSyntax: FileInfo]()
+    for (module, sources) in moduleToSources {
+      for (fileName, fileSyntax) in sources {
+        let configuredRegions = buildConfiguration.map({ fileSyntax.configuredRegions(in: $0) })
+        let oldFileInfo = fileToInfo.updateValue(
+          FileInfo(name: fileName, configuredRegions: configuredRegions, module: module),
+          forKey: fileSyntax
+        )
+        // We can't have duplicate files
+        if oldFileInfo != nil { return nil }
+      }
+    }
 
+    self.init(
+      moduleName: moduleName,
+      moduleToSources: moduleToSources,
+      buildConfiguration: buildConfiguration,
+      fileToInfo: fileToInfo
+    )
+  }
+}
+
+// MARK: File Info
+
+/// Useful information about a file registered in the symbol table:
+/// the file name, its configured regions based on the symbol table's
+/// `buildConfiguration`, and the module name.
+internal struct FileInfo {
+  let name: String
+  let configuredRegions: ConfiguredRegions?
+  let module: ModuleName
+}
+
+extension SymbolTable {
+  func getFileInfo(
+    _ fileSyntax: SourceFileSyntax
+  ) -> FileInfo? {
+    fileToInfo[fileSyntax]
+  }
+}
+
+// MARK: Type Resolution
+
+extension SymbolTable {
   public func resolveSyntax(
     typeSyntax: Attached<TypeSyntax>
   ) -> TypeResolver.TypeResult<ResolvedType<ResolvedTypeSyntax>> {
@@ -80,53 +119,51 @@ public final class SymbolTable {
   }
 }
 
-extension SymbolTable {
-  /// Initializes `moduleMap`
-  private func _generateModuleMap() -> [SourceFileSyntax: ModuleName] {
-    var result = [SourceFileSyntax: ModuleName]()
-    for (module, sources) in moduleToSources {
-      for source in sources.values {
-        result[source] = module
-      }
-    }
-    return result
-  }
-
-  /// Initializes `fileMap`
-  private func _generateFileMap() -> [SourceFileSyntax: String] {
-    var result = [SourceFileSyntax: String]()
-    for (_, sources) in moduleToSources {
-      for (fileName, source) in sources {
-        result[source] = fileName
-      }
-    }
-    return result
-  }
-}
+// MARK: Registering Nominal Types
 
 extension SymbolTable {
-  /// Sorts results in increasing order by
-  /// (a) Module name (alphabetically), (b) File id (alphabetically), and (c) File position (offset).
-  ///
-  /// Helps maintain deterministic outputs.
-  func sortDeclarations(_ typeDecls: [Attached<TypeDeclSyntax>]) -> [Attached<TypeDeclSyntax>] {
-    typeDecls.sorted(by: { a, b in
-      // Compare modules
-      let moduleA = moduleMap[a.fileRoot]!.name
-      let moduleB = moduleMap[b.fileRoot]!.name
-      guard moduleA == moduleB else {
-        return moduleA < moduleB
-      }
-
-      // If modules are equal, compare file names
-      let fileA = fileMap[a.fileRoot]!
-      let fileB = fileMap[b.fileRoot]!
-      guard fileA == fileB else {
-        return fileA < fileB
-      }
-
-      // If file names are equal, compare positions
-      return a.position < b.position
+  /// Registers nominal type by forwarding to `TypeGraph/registerNominalType`
+  func registerNominalType(
+    topScopeMainDecl: Attached<NominalTypeDeclSyntax>,
+    declName: Identifier,
+    declFileInfo: FileInfo,
+    isGlobal: Bool,
+    originatingSyntax: Attached<TypeLikeSyntax>
+  ) -> Result<ResolvedTypeSyntax, TypeGraph.NominalRegistrationFailure> {
+    return typeGraph.registerNominalType(
+      topScopeMainDecl: topScopeMainDecl,
+      declName: declName,
+      declFileInfo: declFileInfo,
+      isGlobal: isGlobal,
+      symbolTable: self
+    ).map({ nominalRef in
+      ResolvedTypeSyntax(
+        type: nominalRef,
+        syntax: originatingSyntax
+      )
+    })
+  }
+  /// Registers nominal type by forwarding to `TypeGraph/registerNominalType`
+  func registerNominalType(
+    nestedMainDecl: Attached<NominalTypeDeclSyntax>,
+    declName: Identifier,
+    declFileInfo: FileInfo,
+    baseDeclGroup: Attached<DeclGroupSyntaxType>,
+    baseType: ResolvedTypeSyntax,
+    originatingSyntax: Attached<TypeLikeSyntax>
+  ) -> Result<ResolvedTypeSyntax, TypeGraph.NestedNominalRegistrationFailure> {
+    return typeGraph.registerNominalType(
+      nestedMainDecl: nestedMainDecl,
+      declName: declName,
+      declFileInfo: declFileInfo,
+      baseDeclGroup: baseDeclGroup,
+      baseType: baseType.type,
+      symbolTable: self
+    ).map({ nominalRef in
+      ResolvedTypeSyntax(
+        type: nominalRef,
+        syntax: originatingSyntax
+      )
     })
   }
 }
@@ -150,7 +187,6 @@ extension SymbolTable {
     line: UInt = #line
   ) -> T {
     if let nestingLimit = self._logNestingLimit, logPrefix.count >= nestingLimit {
-      fflush(stdout)
       fatalError(
         "Exceeded log nesting limit of \(nestingLimit), suggesting there's an infinite loop. If you think this is a mistake, you may change the limit in `TypeQualifier`."
       )
@@ -172,8 +208,7 @@ extension SymbolTable {
     // By `moduleName` invariant
     let internalSources = moduleToSources[moduleName]!
 
-    // TODO: Check during init that each thing in the module map is a unique source file syntax
-    // and add as invariant.
+    // By `moduleToSources` uniqueness invariant
     let internalFileMap = Dictionary(
       uniqueKeysWithValues: internalSources.map({ (fileName, file) in
         (key: file.id, value: (fileName, file))
