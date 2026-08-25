@@ -29,8 +29,14 @@ public final class SymbolTable {
   /// Useful map for finding a file's name, configured regions and module in constant time.
   private let fileToInfo: [SourceFileSyntax: FileInfo]
 
-  // Tracks requested extensions for extension binding
-  var requestedExtensions: [Attached<ExtensionDeclSyntax>] = []
+  /// Tracks requested extensions for extension binding. Don't access
+  /// directly; use `requestedExtensions`, `appendRequestedExtension` and
+  /// `removeRequestedExtension` instead.
+  ///
+  /// Invariant: Should not contain duplicates
+  var _requestedExtensions: [Attached<ExtensionDeclSyntax>] = []
+  var _requestedExtensionsSet: Set<Attached<ExtensionDeclSyntax>> = []
+
   // TODO: Setters should be private
   //
   /// The extensions that have not yet been admitted to the type graph.
@@ -42,8 +48,6 @@ public final class SymbolTable {
   let _verbose: Bool = false
   let _logNestingLimit: Int? = nil
   var logPrefix = [String]()
-  /// `DebugFileMap` only has a runtime impact in DEBUG builds.
-  internal lazy var debugFileMap: DebugFileMap = _generateDebugFileMap()
 
   private init(
     moduleName: ModuleName,
@@ -113,58 +117,9 @@ extension SymbolTable {
 extension SymbolTable {
   public func resolveSyntax(
     typeSyntax: Attached<TypeSyntax>
-  ) -> TypeResolver.TypeResult<ResolvedType<ResolvedTypeSyntax>> {
+  ) -> TypeResolver.TypeResult {
     var typeResolver = TypeResolver(symbolTable: self, _verbose: _verbose)
     return typeResolver.resolveSyntax(typeSyntax: typeSyntax)
-  }
-}
-
-// MARK: Registering Nominal Types
-
-extension SymbolTable {
-  /// Registers nominal type by forwarding to `TypeGraph/registerNominalType`
-  func registerNominalType(
-    topScopeMainDecl: Attached<NominalTypeDeclSyntax>,
-    declName: Identifier,
-    declFileInfo: FileInfo,
-    isGlobal: Bool,
-    originatingSyntax: Attached<TypeLikeSyntax>
-  ) -> Result<ResolvedTypeSyntax, TypeGraph.NominalRegistrationFailure> {
-    return typeGraph.registerNominalType(
-      topScopeMainDecl: topScopeMainDecl,
-      declName: declName,
-      declFileInfo: declFileInfo,
-      isGlobal: isGlobal,
-      symbolTable: self
-    ).map({ nominalRef in
-      ResolvedTypeSyntax(
-        type: nominalRef,
-        syntax: originatingSyntax
-      )
-    })
-  }
-  /// Registers nominal type by forwarding to `TypeGraph/registerNominalType`
-  func registerNominalType(
-    nestedMainDecl: Attached<NominalTypeDeclSyntax>,
-    declName: Identifier,
-    declFileInfo: FileInfo,
-    baseDeclGroup: Attached<DeclGroupSyntaxType>,
-    baseType: ResolvedTypeSyntax,
-    originatingSyntax: Attached<TypeLikeSyntax>
-  ) -> Result<ResolvedTypeSyntax, TypeGraph.NestedNominalRegistrationFailure> {
-    return typeGraph.registerNominalType(
-      nestedMainDecl: nestedMainDecl,
-      declName: declName,
-      declFileInfo: declFileInfo,
-      baseDeclGroup: baseDeclGroup,
-      baseType: baseType.type,
-      symbolTable: self
-    ).map({ nominalRef in
-      ResolvedTypeSyntax(
-        type: nominalRef,
-        syntax: originatingSyntax
-      )
-    })
   }
 }
 
@@ -197,26 +152,5 @@ extension SymbolTable {
     log("Resolved \(describe(result))", file: file, line: line)
     logPrefix.removeLast()
     return result
-  }
-}
-
-// MARK: DebugFileMap
-
-extension SymbolTable {
-  private func _generateDebugFileMap() -> DebugFileMap {
-    #if DEBUG
-    // By `moduleName` invariant
-    let internalSources = moduleToSources[moduleName]!
-
-    // By `moduleToSources` uniqueness invariant
-    let internalFileMap = Dictionary(
-      uniqueKeysWithValues: internalSources.map({ (fileName, file) in
-        (key: file.id, value: (fileName, file))
-      })
-    )
-    return DebugFileMap(_internalFileMap: internalFileMap)
-    #else
-    return DebugFileMap()
-    #endif
   }
 }

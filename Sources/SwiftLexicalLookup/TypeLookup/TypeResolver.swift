@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// TODO: Remove Glibc import
+@preconcurrency import Glibc
 import SwiftIfConfig
 import SwiftSyntax
 
@@ -17,20 +19,11 @@ import SwiftSyntax
 /// to which the the given type syntax refers.
 @_spi(_QualifiedLookupTests)
 public struct TypeResolver {
-  public typealias Failure = TypeResolutionFailure<
-    GlobalTypeName, ResolvedTypeSyntax
-  >
-  public typealias TypeResult<ResolvedType> = Result<ResolvedType, Failure>
-
   init(symbolTable: SymbolTable, _verbose: Bool) {}
-}
 
-// MARK: Type Syntax
-
-extension TypeResolver {
   public mutating func resolveSyntax(
     typeSyntax: Attached<TypeSyntax>
-  ) -> TypeResult<ResolvedType<ResolvedTypeSyntax>> {
+  ) -> TypeResult {
     fatalError("TODO")
   }
 }
