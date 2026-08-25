@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TODO: Remove Glibc import
-@preconcurrency import Glibc
 import SwiftIfConfig
 import SwiftSyntax
 
