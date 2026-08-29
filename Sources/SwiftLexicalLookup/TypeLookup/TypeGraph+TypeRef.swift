@@ -39,6 +39,11 @@ extension TypeGraph {
     public struct Component: Sendable, Hashable {
       private let qualifier: Qualifier
       private let name: String
+
+      fileprivate init(qualifier: TypeGraph.GlobalTypeName.Qualifier, name: String) {
+        self.qualifier = qualifier
+        self.name = name
+      }
     }
 
     /// The type's components.
@@ -109,50 +114,6 @@ extension TypeGraph.GlobalTypeName {
   }
 }
 
-// MARK: Name Deconstruction
-
-extension TypeGraph.GlobalTypeName {
-  /// Break this name up into a base name and a member, if not a top-level type.
-  var baseAndMember: (base: TypeGraph.GlobalTypeName, member: Component)? {
-    var baseComponents = components
-    // We have at least one component according to initializer precondition
-    let member = baseComponents.popLast()!
-    guard let base = TypeGraph.GlobalTypeName(_components: baseComponents) else {
-      return nil
-    }
-    return (base, member)
-  }
-}
-
-extension TypeGraph.GlobalTypeName {
-  /// Construct a `GlobalTypeName` whose `debugDescription` is the given string
-  /// for testing. Any use outside of testing is unchecked and may result in
-  /// crashes.
-  @_spi(_QualifiedLookupTests)
-  public init(_testName string: String, file: StaticString = #file, line: UInt = #line) {
-    // This is very hacky but basically an external module + a type name will
-    // print verbatim with a '::' between them. So, split the string at '::'
-    // (which every global name has), and use the first part as the qualifier
-    // and the tail as the "name".
-    guard let firstQualifierSeparatorRange = string.firstRange(of: "::") else {
-      fatalError("GlobalTypeName '\(string)' must have at least one qualifier separator '::'.")
-    }
-    let (firstQualifier, tail) = (
-      string[..<firstQualifierSeparatorRange.lowerBound].description,
-      string[firstQualifierSeparatorRange.upperBound...].description
-    )
-    self.init(component: Component(_testQualifier: Qualifier.external(moduleName: firstQualifier), name: tail))
-
-    // Ensure we round-trip correctly
-    precondition(
-      self.debugDescription == string,
-      "Unexpectedly parsed global type name '\(string)' wrong.",
-      file: file,
-      line: line
-    )
-  }
-}
-
 // MARK: Type Ref
 
 extension TypeGraph {
@@ -164,7 +125,8 @@ extension TypeGraph {
     let mainDecl: Attached<NominalTypeDeclSyntax>
     let _version: Int
 
-    internal init(name: GlobalTypeName, mainDecl: Attached<NominalTypeDeclSyntax>, _version: Int) {
+    @_spi(_QualifiedLookupTests)
+    public init(name: GlobalTypeName, mainDecl: Attached<NominalTypeDeclSyntax>, _version: Int) {
       self.name = name
       self.mainDecl = mainDecl
       self._version = _version
@@ -176,23 +138,10 @@ extension TypeGraph {
   /// A reference to a resolved nominal type (global or local) vended by
   /// `TypeGraph`. Contains the unique name and resolved main declaration.
   @_spi(_QualifiedLookupTests)
-  public struct TypeRef: Hashable, Sendable {
-    public enum Storage: Hashable, Sendable {
-      /// Local nominal types cannot be extended
-      case local(Attached<NominalTypeDeclSyntax>)
-      case global(TypeGraph.GlobalTypeRef)
-    }
-
-    public let storage: Storage
-
-    /// Important: Only `TypeGraph` should use this initializer.
-    init(globalReference: TypeGraph.GlobalTypeRef) {
-      storage = .global(globalReference)
-    }
-    /// Important: Only `TypeGraph` should use this initializer.
-    init(localNominalType: Attached<NominalTypeDeclSyntax>) {
-      storage = .local(localNominalType)
-    }
+  public enum TypeRef: Hashable, Sendable {
+    /// Local nominal types cannot be extended
+    case local(Attached<NominalTypeDeclSyntax>)
+    case global(TypeGraph.GlobalTypeRef)
 
     /// The main declaration of this nominal reference
     ///
@@ -201,7 +150,7 @@ extension TypeGraph {
     /// 2. To find generic parameters
     /// 3. Testing if the resovled type match the expected main decl
     public var mainDecl: Attached<NominalTypeDeclSyntax> {
-      switch storage {
+      switch self {
       case .global(let globalReference):
         return globalReference.mainDecl
       case .local(let localDecl):
@@ -243,6 +192,64 @@ extension TypeGraph.GlobalTypeRef: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "\(name.debugDescription) (v\(_version), \(mainDecl.kind))"
   }
+  public var _succinctDescription: String {
+    return name.debugDescription
+  }
+}
+
+extension CodeBlockItemListSyntax {
+  /// The scope decl/stmt/expr enclosing this code-block item list, such as
+  /// `do` or `func`. Returns this scope syntax and an error description if
+  /// no such scope exists.
+  @_spi(_QualifiedLookupTests)
+  public var _prettyScope: (scope: Syntax, prettyDescription: String) {
+    let actualScope = self.parent?.parent
+
+    // A `WithCodeBlockSyntax` like `do` or `WithOptionalCodeBlockSyntax` like `func`
+    if let actualScope, let withCodeBlock = actualScope.asProtocol((any WithCodeBlockSyntax).self) {
+      return (actualScope, withCodeBlock.with(\.body, CodeBlockSyntax(statements: [])).trimmedDescription)
+    } else if let actualScope, let withCodeBlock = actualScope.asProtocol((any WithOptionalCodeBlockSyntax).self) {
+      return (actualScope, withCodeBlock.with(\.body, nil).trimmedDescription)
+    } else {
+      // Fallback descriptions
+      return (Syntax(self), "<CodeBlockItemListSyntax has no grandparent>")
+    }
+  }
+}
+
+extension Attached where Node == NominalTypeDeclSyntax {
+  /// Returns the name of this local declaration or `nil` if global.
+  var localNameDescription: String? {
+    var result = "\(node.name.trimmedDescription)"
+    var ancestor = node.parent
+
+    while let currentAncestor = ancestor {
+      if let nominalParent = currentAncestor.as(NominalTypeDeclSyntax.self) {
+        // We could be nested in local nominal decls
+        result = "\(nominalParent.name.trimmedDescription).\(result)"
+      }
+      // Once we get the local scope, we're done
+      else if let scope = currentAncestor.as(CodeBlockItemListSyntax.self),
+        let parentScope = scope.parent,
+        // Source files and `#if` aren't local scopes
+        !parentScope.is(SourceFileSyntax.self), !parentScope.is(IfConfigClauseSyntax.self)
+      {
+        result = "`\(scope._prettyScope.prettyDescription)`.\(result)"
+        break
+      }
+      // Return `nil` for globals
+      else if let scope = currentAncestor.as(CodeBlockItemListSyntax.self),
+        scope.parent?.is(SourceFileSyntax.self) == true
+      {
+        return nil
+      }
+
+      // Keep going up scopes
+      ancestor = currentAncestor.parent
+    }
+
+    return result
+  }
 }
 
 @_spi(_QualifiedLookupTests)
@@ -250,41 +257,83 @@ extension TypeGraph.TypeRef: CustomDebugStringConvertible {
   /// E.g. 'struct LocalDecl {} (local)' or global
   /// '_(InternalFile.swift)::MyType.ExternalModule::OtherType (v0, structDecl)'
   public var debugDescription: String {
-    switch storage {
+    switch self {
     case .global(let globalReference):
       return globalReference.debugDescription
     case .local(let nominalDecl):
-      return "\(nominalDecl.node._memberlessDescription) (local)"
+      return "\(nominalDecl.localNameDescription ?? "<unexpectedly global>") (local)"
     }
   }
 
+  /// A shorter description solely with information used for testing/
+  /// important logs.
+  ///
   /// E.g. a local 'struct LocalDecl {}' or global
   /// '_(InternalFile.swift)::MyType.ExternalModule::OtherType'
   public var _succinctDescription: String {
-    switch storage {
+    switch self {
     case .global(let globalReference):
-      return globalReference.name.debugDescription
+      return globalReference._succinctDescription
     case .local(let nominalDecl):
-      return "\(nominalDecl.node._memberlessDescription)"
+      return nominalDecl._memberlessDescription
     }
   }
 
   /// Extracts the global-type name if a global reference. Useful for testing.
   public var globalName: TypeGraph.GlobalTypeName? {
-    guard case .global(let globalReference) = storage else { return nil }
-
-    return globalReference.name
+    switch self {
+    case .global(let globalReference):
+      return globalReference.name
+    case .local:
+      return nil
+    }
   }
 }
 
 // MARK: Test Hooks
 
-extension TypeGraph.GlobalTypeName.Component {
+extension TypeGraph.GlobalTypeName {
+  /// Construct a `GlobalTypeName` whose `debugDescription` is the given string
+  /// for testing. Any use outside of testing is unchecked and may result in
+  /// crashes.
   @_spi(_QualifiedLookupTests)
-  public init(_testQualifier qualifier: TypeGraph.GlobalTypeName.Qualifier, name: String) {
-    self.init(
-      qualifier: qualifier,
-      name: name
+  public static func _mock(nameDescription string: String, file: StaticString = #file, line: UInt = #line) -> Self {
+    // This is very hacky but basically an external module + a type name will
+    // print verbatim with a '::' between them. So, split the string at '::'
+    // (which every global name has), and use the first part as the qualifier
+    // and the tail as the "name".
+    guard let firstQualifierSeparatorRange = string.firstRange(of: "::") else {
+      fatalError("GlobalTypeName '\(string)' must have at least one qualifier separator '::'.", file: file, line: line)
+    }
+    let (firstQualifier, tail) = (
+      string[..<firstQualifierSeparatorRange.lowerBound].description,
+      string[firstQualifierSeparatorRange.upperBound...].description
     )
+    let instance = Self(
+      component: Component(qualifier: Qualifier.external(moduleName: firstQualifier), name: tail)
+    )
+
+    // Ensure we round-trip correctly
+    precondition(
+      instance.debugDescription == string,
+      "Unexpectedly parsed global type name '\(string)' wrong.",
+      file: file,
+      line: line
+    )
+
+    return instance
+  }
+}
+
+extension TypeGraph.GlobalTypeRef {
+  /// Creates a mock `ResolvedTypeSyntax` where `unusedNominalDecl` can be any
+  /// `Attached<NominalTypeDeclSyntax>` instance and isn't used to produce a
+  /// description.
+  @_spi(_QualifiedLookupTests)
+  public static func _mock(
+    globalName: TypeGraph.GlobalTypeName,
+    unusedNominalDecl: Attached<NominalTypeDeclSyntax>
+  ) -> TypeGraph.GlobalTypeRef {
+    TypeGraph.GlobalTypeRef(name: globalName, mainDecl: unusedNominalDecl, _version: -1)
   }
 }
