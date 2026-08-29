@@ -27,31 +27,17 @@ extension TypeResolver {
   }
 }
 
-// MARK: GlobalResolvedTypeSyntax
-
-/// A type used by `GenericTypeResult` to represent nominal types.
-/// SwiftLexicalLookup just uses `TypeResolver.ResolvedTypeSyntax`
-/// and testing uses `Character` markers.
-@_spi(_QualifiedLookupTests)
-public protocol NominalTypeResultProtocol: CustomDebugStringConvertible, Sendable {}
+// MARK: ResolvedTypeSyntax
 
 extension TypeResolver {
   /// A `NominalTypeRef` and the syntax that was resolved.
   @_spi(_QualifiedLookupTests)
-  public struct ResolvedTypeSyntax: NominalTypeResultProtocol {
+  public struct ResolvedTypeSyntax: Sendable, CustomDebugStringConvertible {
     public let type: TypeGraph.TypeRef
     public let syntax: Attached<TypeLikeSyntax>
 
     public var debugDescription: String {
-      type.debugDescription
-    }
-    var _succinctDescription: String {
-      switch type.storage {
-      case .global(let global):
-        return global.name.debugDescription
-      case .local(let nominalDecl):
-        return nominalDecl._memberlessDescription
-      }
+      type._succinctDescription
     }
   }
 }
@@ -60,7 +46,7 @@ extension TypeResolver.ResolvedTypeSyntax {
   /// Map from a `GlobalNominalTypeRef` to a `NominalTypeRef`
   init(global: TypeResolver.GloballyResolvedTypeSyntax) {
     self.init(
-      type: TypeGraph.TypeRef(globalReference: global.type),
+      type: TypeGraph.TypeRef.global(global.type),
       syntax: global.syntax
     )
   }
@@ -69,43 +55,39 @@ extension TypeResolver.ResolvedTypeSyntax {
 // MARK: ResolvedType
 
 extension TypeResolver {
-  @_spi(_QualifiedLookupTests)
-  public typealias TypeResult = GenericTypeResult<ResolvedTypeSyntax>
-
   /// The type result of structural type resolution. `Result`
   /// represents a nominal type.
   @_spi(_QualifiedLookupTests)
-  public indirect enum GenericTypeResult<NominalType: NominalTypeResultProtocol>: Sendable {
+  public indirect enum TypeResult: Sendable {
     /// E.g. `(A) -> ()`
     case function(argumentCount: Int)
     /// E.g. `(a: A, _: B)`
     case tuple(labels: [Identifier?])
     /// Either a single type or a composition of protocols/classes.
-    case nominalTypes([NominalType])
+    case nominalTypes([ResolvedTypeSyntax])
     /// `Any` or suppressed types like `~Copyable`
     case anyType
     /// E.g. `A.Type`, `((A, B).Type).Type`
-    case metatype(base: GenericTypeResult)
+    case metatype(base: TypeResult)
     // E.g. no type `A` in scope
-    case failure(TypeResolver.GenericFailure<NominalType>)
+    case failure(Failure)
 
     /// Maps the nominal types in `nominalTypes`.
-    public func mapNominals<NewNominalType>(
-      _ transform: (NominalType) -> NewNominalType
-    ) -> GenericTypeResult<NewNominalType> {
+    @_spi(_QualifiedLookupTests)
+    public func _visitNominals(
+      _ visit: (TypeGraph.TypeRef) -> Void
+    ) {
       switch self {
-      case .function(let argumentCount):
-        return .function(argumentCount: argumentCount)
-      case .tuple(let labels):
-        return .tuple(labels: labels)
-      case .anyType:
-        return .anyType
+      case .function, .tuple, .anyType:
+        break
       case .metatype(let base):
-        return .metatype(base: base.mapNominals(transform))
+        base._visitNominals(visit)
       case .nominalTypes(let results):
-        return .nominalTypes(results.map(transform))
+        for result in results {
+          visit(result.type)
+        }
       case .failure(let failure):
-        return .failure(failure._map(mapNominal: transform))
+        failure._visitNominals(visit)
       }
     }
   }
@@ -113,7 +95,7 @@ extension TypeResolver {
 
 // MARK: Debug Description
 
-extension TypeResolver.GenericTypeResult: CustomDebugStringConvertible {
+extension TypeResolver.TypeResult: CustomDebugStringConvertible {
   @_spi(_QualifiedLookupTests)
   public var debugDescription: String {
     switch self {
@@ -130,5 +112,23 @@ extension TypeResolver.GenericTypeResult: CustomDebugStringConvertible {
     case .failure(let failure):
       return ".failure(\(failure.debugDescription))"
     }
+  }
+}
+
+// MARK: ResolvedTypeSyntax + Test Hook
+
+extension TypeResolver.ResolvedTypeSyntax {
+  /// Creates a mock `ResolvedTypeSyntax` where `unusedNominalDecl` can be any
+  /// `Attached<NominalTypeDeclSyntax>` instance and isn't used to produce a
+  /// description.
+  @_spi(_QualifiedLookupTests)
+  public static func _mock(
+    typeRef: TypeGraph.TypeRef,
+    unusedNominalDecl: Attached<NominalTypeDeclSyntax>
+  ) -> TypeResolver.ResolvedTypeSyntax {
+    TypeResolver.ResolvedTypeSyntax(
+      type: typeRef,
+      syntax: Attached<TypeLikeSyntax>(unusedNominalDecl)
+    )
   }
 }
