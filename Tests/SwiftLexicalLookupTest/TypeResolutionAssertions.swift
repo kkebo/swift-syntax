@@ -17,34 +17,21 @@ import SwiftParser
 import SwiftSyntax
 import XCTest
 
-// We use character markers to refer to nominal types.
-@_spi(_QualifiedLookupTests) extension Character: NominalTypeResultProtocol {}
-// ResultName just help us describe the results.
-struct TypeResultName: NominalTypeResultProtocol {
-  let stringName: String
-  init(_ stringName: String) { self.stringName = stringName }
-  var debugDescription: String { stringName }
-}
-
-typealias TestResolvedType = TypeResolver.GenericTypeResult<Character>
-typealias TestExtensionState = GenericExtensionState<Character>
-typealias TestResolutionFailure = TypeResolver.GenericFailure<Character>
-
 /// Asserts the given annotated `TypeSyntax` resolves to the right `NominalTypeDeclSyntax`
 /// and qualified name. Also asserts `ExtensionDeclSyntax`-binding produces the expected
 /// `ExtensionBindingState`.
 /// and `ExtensionDeclSyntax`
 struct TypeResolutionMatcher {
-  /// A marker and the resolved qualified name of the annotated `NominalTypeDeclSyntax`.
+  /// A mock `ResolvedTypeSyntax` representing the name of this
+  /// annotated, global `NominalTypeDeclSyntax`.
   struct Definition {
-    let marker: Character
-    let name: TypeGraph.GlobalTypeName?
+    let nominalType: TypeResolver.ResolvedTypeSyntax
   }
   /// Annotates `TypeSyntax` with a type-resolution result using markers;
   /// also annotates `ExtensionDeclSyntax` with the desired `ExtensionBindingState`.
   enum Expectation {
-    case syntaxResolution(TestResolvedType)
-    case extensionBinding(TestExtensionState)
+    case syntaxResolution(TypeResolver.TypeResult)
+    case extensionBinding(ExtensionState)
   }
 
   let symbolTable: SymbolTable
@@ -65,14 +52,9 @@ extension TypeResolutionMatcher.Definition: LexicalAnnotation, Identifiable, Cus
     LexicalAssertionUtilities.findDirectParent(from: token, ofType: NominalTypeDeclSyntax.self, file: file, line: line)
   }
 
-  var id: Character { marker }
+  var id: String { nominalType.debugDescription }
 
-  // Use the name for a more familiar description,
-  // or the marker (if we don't care about the name
-  // and for local declarations.)
-  var description: String {
-    name?.debugDescription ?? marker.description
-  }
+  var description: String { nominalType.debugDescription }
 }
 
 // MARK: `Expectation` Conformances
@@ -170,120 +152,113 @@ extension TypeResolutionMatcher: LexicalMatcher {
       )
     }
   }
+  /// Look up extended type if not already resolved
+  private func _admitAndGetExtensionState(
+    _ extensionDecl: Attached<ExtensionDeclSyntax>,
+    verbose: Bool,
+    failures: inout [ExpectationFailure]
+  ) -> ExtensionState? {
+    fatalError("TODO")
+  }
 
   func assertExpectation(
     expectation: ContextualizedAnnotation<Expectation>,
-    markersToDefinitions: [Character: ContextualizedAnnotation<Definition>],
+    markersToDefinitions: [String: ContextualizedAnnotation<Definition>],
     syntaxToDefinitions: [NominalTypeDeclSyntax: ContextualizedAnnotation<Definition>],
     verbose: Bool
   ) -> [ExpectationFailure] {
+    func verifyExpectedNominalDescription(_ nominalTypeDescription: String, failures: inout [ExpectationFailure]) {
+      // Ensure we're referencing a marked nominal-type name
+      if markersToDefinitions[nominalTypeDescription] == nil {
+        failures.append(ExpectationFailure.referencesUndefinedMarker(nominalTypeDescription))
+      }
+    }
+    func verifyActualNominal(_ nominalType: TypeGraph.TypeRef, failures: inout [ExpectationFailure]) {
+      // Ensure we've marked syntax with that name
+      let mainDecl = nominalType.mainDecl.node
+      guard let definition = syntaxToDefinitions[mainDecl] else {
+        failures.append(.resultReferencesUnmarkedSyntax(syntaxDescription: mainDecl._memberlessDescription))
+        return
+      }
+
+      // Ensure the actual name matches the marked name
+      let markedName = definition.annotation.nominalType.debugDescription
+      guard nominalType._succinctDescription == markedName else {
+        failures.append(
+          ExpectationFailure.other(
+            failure:
+              "Expected nominal-type decl `\(mainDecl._memberlessDescription)` to be named '\(markedName)' but instead got name '\(nominalType._succinctDescription)'."
+          )
+        )
+        return
+      }
+    }
+    // Force unwrap we parse from a file
+    let expectationSyntax = Attached(expectation.syntax)!
+
+    // Check the given `TypeSyntax` resolution or extension-binding state
+    var failures = [ExpectationFailure]()
+    let expectedDescription: String
+    let actualDescription: String
     switch expectation.annotation {
     case .syntaxResolution(let expectedType):
-      guard let typeSyntax = expectation.syntax.as(TypeSyntax.self) else {
+      guard let typeSyntax = expectationSyntax.as(TypeSyntax.self) else {
         fatalError(
           "[SwiftLexicalLookup] Internal test error: Expected syntax-resolution queries to find 'TypeSyntax' nodes, but got '\(expectation.syntax.kind)'."
         )
       }
 
-      return _assertTypeSyntax(
-        // Force unwrap because we parsed this from `lookupSources`
-        typeSyntax: Attached(typeSyntax)!,
-        expectedType: expectedType,
-        markersToDefinitions: markersToDefinitions,
-        syntaxToDefinitions: syntaxToDefinitions,
-        verbose: verbose
-      )
+      // Perform the lookup to get the `actualResult` (as opposed to `expectedResult`)
+      let actualType: TypeResolver.TypeResult = symbolTable.resolve(typeSyntax: typeSyntax)
+
+      // Check the nested nominals
+      expectedType._visitNominals({ verifyExpectedNominalDescription($0._succinctDescription, failures: &failures) })
+      actualType._visitNominals({ verifyActualNominal($0, failures: &failures) })
+
+      // Describe the types
+      (expectedDescription, actualDescription) = (expectedType.debugDescription, actualType.debugDescription)
+
     case .extensionBinding(let expectedState):
-      guard let extensionDecl = expectation.syntax.as(ExtensionDeclSyntax.self) else {
+      guard let extensionDecl = expectationSyntax.as(ExtensionDeclSyntax.self) else {
         fatalError(
           "[SwiftLexicalLookup] Internal test error: Expected syntax-resolution queries to find 'ExtensionDeclSyntax' nodes, but got '\(expectation.syntax.kind)'."
         )
       }
 
-      return _assertExtensionBinding(
-        // Force unwrap because we parsed this from `lookupSources`
-        extensionDecl: Attached(extensionDecl)!,
-        expectedRawState: expectedState,
-        markersToDefinitions: markersToDefinitions,
-        syntaxToDefinitions: syntaxToDefinitions,
-        verbose: verbose
+      // Give up if we can't get the extension state
+      guard let actualState = _admitAndGetExtensionState(extensionDecl, verbose: verbose, failures: &failures) else {
+        return failures
+      }
+
+      // Check the nested nominals
+      expectedState._visitTypes(
+        visitResolved: { verifyExpectedNominalDescription($0._succinctDescription, failures: &failures) },
+        visitName: { name in
+          verifyExpectedNominalDescription(name.debugDescription, failures: &failures)
+        }
       )
-    }
-  }
+      actualState._visitTypes(
+        visitResolved: { verifyActualNominal($0, failures: &failures) },
+        // `GlobalTypeName` doesn't store syntax information like `GlobalTypeRef`,
+        // so we can't call `verifyActualNominal`. Of course, we still check if we
+        // get the right type result by comparing the descriptions below.
+        visitName: { _ in }
+      )
 
-  /// `assertExpectation` forwards extensions here.
-  private func _assertExtensionBinding(
-    extensionDecl: Attached<ExtensionDeclSyntax>,
-    expectedRawState: TestExtensionState,
-    markersToDefinitions: [Character: ContextualizedAnnotation<Definition>],
-    syntaxToDefinitions: [NominalTypeDeclSyntax: ContextualizedAnnotation<Definition>],
-    verbose: Bool
-  ) -> [ExpectationFailure] {
-    fatalError("TODO")
-  }
-
-  /// `assertExpectation` forwards type syntax here.
-  private func _assertTypeSyntax(
-    typeSyntax: Attached<TypeSyntax>,
-    expectedType: TestResolvedType,
-    markersToDefinitions: [Character: ContextualizedAnnotation<Definition>],
-    syntaxToDefinitions: [NominalTypeDeclSyntax: ContextualizedAnnotation<Definition>],
-    verbose: Bool
-  ) -> [ExpectationFailure] {
-    // Print target syntax (to show the syntax kinds)
-    if verbose {
-      print("Target syntax parsed as:\n\(typeSyntax.node.debugDescription)\n")
+      // Describe the states
+      (expectedDescription, actualDescription) = (actualState.debugDescription, expectedState.debugDescription)
     }
 
-    // Perform the lookup to get the `actualResult` (as opposed to `expectedResult`)
-    let actualType: TypeResolver.TypeResult = symbolTable.resolveSyntax(
-      typeSyntax: typeSyntax
-    )
-
-    // Assert output
-    var failures = [ExpectationFailure]()
-    let actualTypeDescription: String = actualType.mapNominals({ nominalType -> TypeResultName in
-      guard let targetDefinition = syntaxToDefinitions[nominalType.type.mainDecl.node] else {
-        failures.append(
-          ExpectationFailure.resultReferencesUnmarkedSyntax(
-            syntaxDescription: nominalType.type.globalName.debugDescription
-          )
-        )
-        return TypeResultName("")
-      }
-      // Ensure we got the right name
-      let actualName = nominalType.type.globalName?.debugDescription
-      if let expectedName = targetDefinition.annotation.name?.debugDescription, actualName != expectedName {
-        failures.append(
-          ExpectationFailure.other(
-            failure:
-              "Expected name '\(expectedName)' for type marked '\(targetDefinition.annotation.marker)' but got '\(actualName?.debugDescription ?? "nil")'."
-          )
-        )
-        return TypeResultName("")
-      }
-
-      return TypeResultName(targetDefinition.annotation.description)
-    }).debugDescription
-
-    let expectedTypeDescription: String = expectedType.mapNominals({ marker -> TypeResultName in
-      guard let targetDefinition = markersToDefinitions[marker] else {
-        failures.append(ExpectationFailure.referencesUndefinedMarker(marker))
-        return TypeResultName("")
-      }
-      return TypeResultName(targetDefinition.annotation.description)
-    }).debugDescription
-    // Give up if markers are undefined (i.e. we already have failures)
+    // Give up if the expectation/actual results have undefined references
     guard failures.isEmpty else { return failures }
 
-    guard expectedTypeDescription == actualTypeDescription else {
+    // Check they're equal
+    guard expectedDescription == actualDescription else {
       return [
-        ExpectationFailure.other(
-          failure:
-            "Resolved-type mismatch. Expected: \(expectedTypeDescription)\nBut got:  \(actualTypeDescription)"
-        )
+        .other(failure: "Resolved-type mismatch.\nExpected: \(expectedDescription)\nBut got:  \(actualDescription)")
       ]
     }
+
     return []
   }
 }
@@ -336,15 +311,14 @@ func assertTypeResolution(
 
 extension LexicalLookupSource.Interpolation where Matcher == TypeResolutionMatcher {
   mutating func appendInterpolation(
-    _ marker: Character,
-    name: TypeGraph.GlobalTypeName? = nil,
+    name mockedNominalType: TypeResolver.ResolvedTypeSyntax,
     file: StaticString = #file,
     line: UInt = #line
   ) {
-    append(definition: TypeResolutionMatcher.Definition(marker: marker, name: name), file: file, line: line)
+    append(definition: TypeResolutionMatcher.Definition(nominalType: mockedNominalType), file: file, line: line)
   }
   mutating func appendInterpolation(
-    extensionState: TestExtensionState,
+    extensionState: ExtensionState,
     file: StaticString = #file,
     line: UInt = #line
   ) {
@@ -355,46 +329,74 @@ extension LexicalLookupSource.Interpolation where Matcher == TypeResolutionMatch
     )
   }
   mutating func appendInterpolation(
-    type: TestResolvedType,
+    type: TypeResolver.TypeResult,
     file: StaticString = #file,
     line: UInt = #line
   ) {
     appendInterpolation(expects: [TypeResolutionMatcher.Expectation.syntaxResolution(type)], file: file, line: line)
   }
   mutating func appendInterpolation(
-    failure: TestResolutionFailure,
+    failure: TypeResolver.Failure,
     file: StaticString = #file,
     line: UInt = #line
   ) {
-    appendInterpolation(type: TestResolvedType.failure(failure), file: file, line: line)
+    appendInterpolation(type: TypeResolver.TypeResult.failure(failure), file: file, line: line)
   }
   mutating func appendInterpolation(
-    nominals markers: [Character],
+    nominals: [TypeResolver.ResolvedTypeSyntax],
     file: StaticString = #file,
     line: UInt = #line
   ) {
-    appendInterpolation(type: TestResolvedType.nominalTypes(markers), file: file, line: line)
+    appendInterpolation(type: TypeResolver.TypeResult.nominalTypes(nominals), file: file, line: line)
   }
   mutating func appendInterpolation(
-    nominal marker: Character,
+    nominal: TypeResolver.ResolvedTypeSyntax,
     file: StaticString = #file,
     line: UInt = #line
   ) {
-    appendInterpolation(nominals: [marker], file: file, line: line)
+    appendInterpolation(nominals: [nominal], file: file, line: line)
   }
 }
 
 // MARK: Convenience Initializers
 
-extension TypeLikeSyntax: ExpressibleByStringLiteral {
-  public init(stringLiteral value: StringLiteralType) {
-    self.init(TypeSyntax(stringLiteral: value))
+@_spi(_QualifiedLookupTests)
+extension TypeGraph.GlobalTypeName: ExpressibleByStringLiteral {
+  public init(stringLiteral string: String) {
+    self = ._mock(nameDescription: string)
   }
 }
 
-extension ExtensionDependency {
-  init(baseType: TypeGraph.GlobalTypeName, members: [IdentifierWrapper]) {
-    fatalError("TODO")
+@_spi(_QualifiedLookupTests)
+extension TypeGraph.GlobalTypeRef: ExpressibleByStringLiteral {
+  public init(stringLiteral string: String) {
+    self = TypeGraph.GlobalTypeRef._mock(
+      globalName: TypeGraph.GlobalTypeName(stringLiteral: string),
+      unusedNominalDecl: "struct"
+    )
+  }
+}
+
+@_spi(_QualifiedLookupTests)
+extension TypeResolver.ResolvedTypeSyntax: ExpressibleByStringLiteral {
+  /// Mock a global type reference with the given debug description, e.g.,
+  /// `_(MyFile.swift)::MyType`.
+  public init(stringLiteral string: String) {
+    self = ._mock(
+      typeRef: TypeGraph.TypeRef.global(
+        TypeGraph.GlobalTypeRef(stringLiteral: string)
+      ),
+      unusedNominalDecl: "struct"
+    )
+  }
+
+  /// Mock a local type by providing its main declaration without members,
+  /// e.g., `struct A {}`.
+  static func local(_ nominalDecl: Attached<NominalTypeDeclSyntax>) -> TypeResolver.ResolvedTypeSyntax {
+    TypeResolver.ResolvedTypeSyntax._mock(
+      typeRef: TypeGraph.TypeRef.local(nominalDecl),
+      unusedNominalDecl: "struct"
+    )
   }
 }
 
@@ -413,7 +415,13 @@ struct IdentifierWrapper: ExpressibleByStringLiteral {
   }
 }
 
-extension TestExtensionState {
+extension ExtensionDependency {
+  init(baseType: TypeGraph.GlobalTypeName, members: [IdentifierWrapper]) {
+    fatalError("TODO")
+  }
+}
+
+extension ExtensionState {
   /// Creates a mock extension state to check an extension's dependencies,
   /// bound type, or failure to bind due to cycles.
   ///
@@ -424,33 +432,45 @@ extension TestExtensionState {
   /// binding.
   init(
     dependencies: [ExtensionDependency],
-    resolvedType: Result<TypeGraph.GlobalTypeName, TestResolutionFailure>,
+    resolvedType: Result<TypeGraph.GlobalTypeName, TypeResolver.Failure>,
     file: StaticString = #file,
     line: UInt = #line
   ) {
-    fatalError("TODO")
+    // Create fake extension (won't be checked)
+    //
+    // Wrap the type syntax in a file
+    var parser = Parser("extension")
+    let sourceFile = SourceFileSyntax.parse(from: &parser)
+    let mockExtension = Attached(sourceFile.children(ofType: ExtensionDeclSyntax.self)[0])!
+
+    self.init(
+      _uncheckedDependencies: dependencies,
+      // Extension decl won't be checked
+      extensionDecl: mockExtension,
+      resolvedType: resolvedType
+    )
   }
 
   static func bound(
-    to typeName: TypeGraph.GlobalTypeName,
-    dependencies: [ExtensionDependency]
-  ) -> TestExtensionState {
-    TestExtensionState(dependencies: dependencies, resolvedType: .success(typeName))
+    dependencies: [ExtensionDependency],
+    typeName: TypeGraph.GlobalTypeName,
+  ) -> ExtensionState {
+    ExtensionState(dependencies: dependencies, resolvedType: .success(typeName))
   }
 
   static func invalidCycle(
     dependencies: [ExtensionDependency],
-    cycleElements: [(introducingDecl: String?, extension: String, base: TypeGraph.GlobalTypeName)],
+    cycleElements: [(introducingDecl: String?, extension: String, base: TypeGraph.GlobalTypeRef)],
     conflictingMember: IdentifierWrapper,
     file: StaticString = #file,
     line: UInt = #line
-  ) -> TestExtensionState {
-    let dependencyPath: [GenericDependencyCycleElement<TypeGraph.GlobalTypeName>] = cycleElements.map({
+  ) -> ExtensionState {
+    let dependencyPath: [TypeResolver.ExtensionCycleElement] = cycleElements.map({
       (
         introducingTypeDeclText,
         extensionDeclText,
         baseTypeName
-      ) -> GenericDependencyCycleElement<TypeGraph.GlobalTypeName> in
+      ) -> TypeResolver.ExtensionCycleElement in
       let introducingTypeDecl: TypeDeclSyntax?
       if let introducingTypeDeclText {
         let typeDeclRaw = DeclSyntax(stringLiteral: introducingTypeDeclText)
@@ -474,28 +494,21 @@ extension TestExtensionState {
           line: line
         )
       }
-      return GenericDependencyCycleElement(
+      return TypeResolver.ExtensionCycleElement(
         introducingTypeDecl: introducingTypeDecl,
         extensionDecl: extensionDecl,
         boundType: baseTypeName
       )
     })
 
-    let cycle = GenericExtensionBindingCycle<TypeGraph.GlobalTypeName>(
+    let cycle = TypeResolver.ExtensionCycle(
       dependencyPath: dependencyPath,
       dependencyMember: conflictingMember.identifier
     )
 
-    return TestExtensionState(
+    return ExtensionState(
       dependencies: dependencies,
-      resolvedType: Result.failure(TestResolutionFailure.cyclicalExtensionDependency(cycle))
+      resolvedType: Result.failure(TypeResolver.Failure.cyclicalExtensionDependency(cycle))
     )
-  }
-}
-
-@_spi(_QualifiedLookupTests)
-extension TypeGraph.GlobalTypeName: ExpressibleByStringLiteral {
-  public init(stringLiteral string: String) {
-    self.init(_testName: string)
   }
 }

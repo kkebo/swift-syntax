@@ -37,12 +37,34 @@ extension TypeGraph {
 @_spi(_QualifiedLookupTests)
 public struct ExtensionDependency: Sendable {}
 
+/// The state of an admitted extension: what type it resolved to and the
+/// dependencies for that resolution result.
+///
+/// Note: Extension state uses `GlobalTypeName` instead of `GlobalTypeRef`
+/// since the type graph already stores information about types in a
+/// different property.
 @_spi(_QualifiedLookupTests)
-public struct GenericExtensionState<NominalType: NominalTypeResultProtocol>: Sendable {}
+public struct ExtensionState: Sendable {
+  @_spi(_QualifiedLookupTests)
+  public init(
+    _uncheckedDependencies dependencies: [ExtensionDependency],
+    extensionDecl: Attached<ExtensionDeclSyntax>,
+    resolvedType: Result<TypeGraph.GlobalTypeName, TypeResolver.Failure>
+  ) {}
+}
 
 @_spi(_QualifiedLookupTests)
-public typealias ExtensionState = GenericExtensionState<TypeResolver.ResolvedTypeSyntax>
+extension ExtensionState: CustomDebugStringConvertible {
+  public var debugDescription: String { "" }
 
+  @_spi(_QualifiedLookupTests)
+  public func _visitTypes(
+    visitResolved: (TypeGraph.TypeRef) -> Void,
+    visitName: (TypeGraph.GlobalTypeName) -> Void
+  ) {
+    fatalError("TODO")
+  }
+}
 // MARK: Lookup
 
 @_spi(_QualifiedLookupTests)

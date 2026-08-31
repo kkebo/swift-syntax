@@ -19,7 +19,7 @@ import SwiftSyntax
 public struct TypeResolver {
   init(symbolTable: SymbolTable, _verbose: Bool) {}
 
-  public mutating func resolveSyntax(
+  mutating func resolve(
     typeSyntax: Attached<TypeSyntax>
   ) -> TypeResult {
     fatalError("TODO")
