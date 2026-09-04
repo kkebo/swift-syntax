@@ -12,7 +12,7 @@
 
 import SwiftSyntax
 
-/// Protocol for `NominalTypeDeclSyntax`. Only `[Struct/Enum/Class/Actor/Protocol]DeclSyntax`
+/// Protocol encapsulating `NominalTypeDeclSyntax`. Only `[Struct/Enum/Class/Actor/Protocol]DeclSyntax`
 /// should conform.
 @_spi(_QualifiedLookup) public protocol NominalTypeDeclSyntaxProtocol: DeclGroupSyntax, NamedDeclSyntax {}
 
@@ -39,6 +39,8 @@ import SwiftSyntax
     ])
   }
 }
+
+// MARK: Properties
 
 extension NominalTypeDeclSyntax: DeclGroupSyntax {
   private func _getGroupProp<T>(_ prop: KeyPath<any NominalTypeDeclSyntaxProtocol, T>) -> T {
@@ -124,5 +126,50 @@ extension NominalTypeDeclSyntax: DeclGroupSyntax {
   public var memberBlock: MemberBlockSyntax {
     get { _getGroupProp(\.memberBlock) }
     set { _setGroupProp(\.memberBlock, newValue: newValue) }
+  }
+}
+
+// MARK: Generic Parameters
+
+extension NominalTypeDeclSyntax {
+  /// Find the given generic parameter in this nominal-type declaration.
+  /// Empty for protocols (they only have associated types)
+  func findGenericParameters(withName name: Identifier?) -> [GenericParameterSyntax] {
+    // Extract the parameter clause, or `nil` for protocols.
+    let parameterClause: GenericParameterClauseSyntax?
+    switch _syntaxNode.as(SyntaxEnum.self) {
+    case .structDecl(let nonProtocolDecl):
+      parameterClause = nonProtocolDecl.genericParameterClause
+    case .enumDecl(let nonProtocolDecl):
+      parameterClause = nonProtocolDecl.genericParameterClause
+    case .classDecl(let nonProtocolDecl):
+      parameterClause = nonProtocolDecl.genericParameterClause
+    case .actorDecl(let nonProtocolDecl):
+      parameterClause = nonProtocolDecl.genericParameterClause
+    case .protocolDecl:
+      parameterClause = nil
+    default:
+      assertionFailure(
+        "[SwiftLexicalLookup] Internal error: Unexpectedly got nominal type declaration of unrecognized kind '\(kind)'."
+      )
+      return []
+    }
+
+    guard let parameterClause else { return [] }
+
+    // Return all parameters if we don't filter by name
+    guard let name else { return Array(parameterClause.parameters) }
+    return parameterClause.parameters.filter({ parameter in
+      parameter.name.identifier == name
+    })
+  }
+}
+
+// MARK: Upcasts
+
+extension Attached where Node == TypeDeclSyntax {
+  init<S: NominalTypeDeclSyntaxProtocol>(_ node: __shared Attached<S>) {
+    // All nominal-type declarations are type declarations.
+    self = node.as(TypeDeclSyntax.self)!
   }
 }

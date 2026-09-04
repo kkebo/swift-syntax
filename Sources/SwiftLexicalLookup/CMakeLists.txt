@@ -29,12 +29,21 @@ add_swift_syntax_library(SwiftLexicalLookup
   QualifiedLookup/DeclName.swift
   QualifiedLookup/DeclScope.swift
   QualifiedLookup/MemberKind.swift
+  QualifiedLookup/ModuleLookup.swift
   QualifiedLookup/NominalTypeDeclSyntax.swift
   QualifiedLookup/TypeDeclSyntax.swift
   QualifiedLookup/TypeLikeSyntax.swift
   QualifiedLookup/ValueDeclSyntax.swift
 
+  TypeLookup/ExtensionFinder.swift
   TypeLookup/PartialTypeResolution.swift
+  TypeLookup/SymbolTable+TypeGraph.swift
+  TypeLookup/SymbolTable.swift
+  TypeLookup/TypeGraph+TypeRef.swift
+  TypeLookup/TypeGraph.swift
+  TypeLookup/TypeResolver+Failure.swift
+  TypeLookup/TypeResolver+TypeResult.swift
+  TypeLookup/TypeResolver.swift
   TypeLookup/UnqualifiedTypeLookup.swift
 )
 

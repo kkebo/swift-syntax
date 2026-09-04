@@ -24,28 +24,10 @@ extension TypeDeclSyntax: ExpressibleByStringLiteral {
   }
 }
 
-extension Attached where Node == TypeSyntax {
-  /// Parses the given type syntax in a file with `typeSyntaxPrefix`.
-  /// By default, the `let _: ` prefix parses type syntax as a variable type.
-  public static func typeSyntax(
-    typeSyntaxPrefix: String = "let _: ",
-    _ syntaxString: StringLiteralType,
-    file: StaticString = #file,
-    line: UInt = #line
-  ) -> Attached<TypeSyntax> {
-    var parser = Parser("\(typeSyntaxPrefix)\(syntaxString)")
-    let fileSyntax = SourceFileSyntax.parse(from: &parser)
-    guard let typeSyntax = fileSyntax.children(ofType: TypeSyntax.self).first else {
-      fatalError("`\(syntaxString)` didn't parse as type syntax.", file: file, line: line)
-    }
-    return Attached<TypeSyntax>(typeSyntax)!
-  }
-}
-
 extension TypeReference {
   /// Convenience initializer since we ignore `introducingSyntax` in tests.
   init(module: Identifier? = nil, name: Identifier) {
-    self.init(module: module, name: name, introducingSyntax: .typeSyntax(""))
+    self.init(module: module, name: name, introducingSyntax: "")
   }
 }
 
@@ -59,7 +41,7 @@ func assertPartialResolutionResult(
   line: UInt = #line
 ) {
   // Compute
-  let syntax = Attached.typeSyntax(typeSyntaxPrefix: typeSyntaxPrefix, typeSyntax, file: file, line: line)
+  let syntax = Attached<TypeSyntax>.parse(typeSyntax, prefix: typeSyntaxPrefix, file: file, line: line)
   let actualResult = syntax.partiallyResolve()
   // Convert to strings to compare syntax
   let expectedDescription = result._debugDescription
@@ -125,7 +107,7 @@ final class PartialTypeResolutionTests: XCTestCase {
     // Metatype, named opaque return type, class restriction
     assertPartialResolutionResult(
       typeSyntax: "(() -> A, B).Type",
-      result: .success(.composition([]))
+      result: .success(.metatype(base: "(() -> A, B)"))
     )
     assertPartialResolutionResult(
       typeSyntax: "<T: Hashable> [T]",
@@ -144,26 +126,20 @@ final class PartialTypeResolutionTests: XCTestCase {
     assertPartialResolutionResult(
       typeSyntax: "A",
       result: .success(
-        .typeIdentifier(.success(TypeReference(name: "A")))
+        .typeIdentifier(TypeReference(name: "A"))
       )
     )
     // Module selector
     assertPartialResolutionResult(
       typeSyntax: "Module::Type",
       result: .success(
-        .typeIdentifier(
-          .success(
-            TypeReference(module: "Module", name: "Type")
-          )
-        )
+        .typeIdentifier(TypeReference(module: "Module", name: "Type"))
       )
     )
     // Erroneous
     assertPartialResolutionResult(
       typeSyntax: "Module::_",
-      result: .success(
-        .typeIdentifier(.failure(InvalidTypeIdentifierFailure()))
-      )
+      result: .failure(.invalidTypeIdentifier)
     )
 
     // Members
@@ -171,10 +147,8 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "(Int & (A, B)).MyMember",
       result: .success(
         .member(
-          base: .typeSyntax("(Int & (A, B))"),
-          memberComponent: .success(
-            TypeReference(name: "MyMember")
-          )
+          base: "(Int & (A, B))",
+          memberComponent: TypeReference(name: "MyMember")
         )
       )
     )
@@ -183,10 +157,8 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "(A & B).Module::C",
       result: .success(
         .member(
-          base: .typeSyntax("(A & B)"),
-          memberComponent: .success(
-            TypeReference(module: "Module", name: "C")
-          )
+          base: "(A & B)",
+          memberComponent: TypeReference(module: "Module", name: "C")
         )
       )
     )
@@ -195,10 +167,8 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "(() -> Int).Self",
       result: .success(
         .member(
-          base: .typeSyntax("(() -> Int)"),
-          memberComponent: .success(
-            TypeReference(name: "Self")
-          )
+          base: "(() -> Int)",
+          memberComponent: TypeReference(name: "Self")
         )
       )
     )
@@ -206,10 +176,8 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "(() -> Int).`Self`",
       result: .success(
         .member(
-          base: .typeSyntax("(() -> Int)"),
-          memberComponent: .success(
-            TypeReference(name: "Self")
-          )
+          base: "(() -> Int)",
+          memberComponent: TypeReference(name: "Self")
         )
       )
     )
@@ -220,40 +188,40 @@ final class PartialTypeResolutionTests: XCTestCase {
     assertPartialResolutionResult(
       typeSyntax: "`Any`",
       result: .success(
-        .typeIdentifier(.success(TypeReference(name: "Any")))
+        .typeIdentifier(TypeReference(name: "Any"))
       )
     )
     // Module+Any keyword -> type identifier
     assertPartialResolutionResult(
       typeSyntax: "MyModule::Any",
-      result: .success(.typeIdentifier(.success(TypeReference(module: "MyModule", name: "Any"))))
+      result: .success(.typeIdentifier(TypeReference(module: "MyModule", name: "Any")))
     )
     // Self -> type identifier
     assertPartialResolutionResult(
       typeSyntax: "Self",
-      result: .success(.typeIdentifier(.success(TypeReference(name: "Self"))))
+      result: .success(.typeIdentifier(TypeReference(name: "Self")))
     )
     assertPartialResolutionResult(
       typeSyntax: "MyModule::Self",
-      result: .success(.typeIdentifier(.success(TypeReference(module: "MyModule", name: "Self"))))
+      result: .success(.typeIdentifier(TypeReference(module: "MyModule", name: "Self")))
     )
     // .self -> type identifier
     assertPartialResolutionResult(
       typeSyntax: "A.`self`",
       result: .success(
-        .member(base: "A", memberComponent: .success(TypeReference(name: "self")))
+        .member(base: "A", memberComponent: TypeReference(name: "self"))
       )
     )
     assertPartialResolutionResult(
       typeSyntax: "A.self",
       result: .success(
-        .member(base: "A", memberComponent: .success(TypeReference(name: "self")))
+        .member(base: "A", memberComponent: TypeReference(name: "self"))
       )
     )
     assertPartialResolutionResult(
       typeSyntax: "A.Module::self",
       result: .success(
-        .member(base: "A", memberComponent: .success(TypeReference(module: "Module", name: "self")))
+        .member(base: "A", memberComponent: TypeReference(module: "Module", name: "self"))
       )
     )
   }
@@ -263,20 +231,20 @@ final class PartialTypeResolutionTests: XCTestCase {
     assertPartialResolutionResult(
       typeSyntax: "T?",
       result: .success(
-        .typeIdentifier(.success(TypeReference(module: "Swift", name: "Optional")))
+        .typeIdentifier(TypeReference(module: "Swift", name: "Optional"))
       )
     )
     assertPartialResolutionResult(
       typeSyntax: "T!",
       result: .success(
-        .typeIdentifier(.success(TypeReference(module: "Swift", name: "Optional")))
+        .typeIdentifier(TypeReference(module: "Swift", name: "Optional"))
       )
     )
     // Array
     assertPartialResolutionResult(
       typeSyntax: "[T]",
       result: .success(
-        .typeIdentifier(.success(TypeReference(module: "Swift", name: "Array")))
+        .typeIdentifier(TypeReference(module: "Swift", name: "Array"))
       )
     )
     // Inline array
@@ -284,7 +252,7 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "[_ of T]",
       result: .success(
         .typeIdentifier(
-          .success(TypeReference(module: "Swift", name: "InlineArray"))
+          TypeReference(module: "Swift", name: "InlineArray")
         )
       )
     )
@@ -293,7 +261,7 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "[T: S]",
       result: .success(
         .typeIdentifier(
-          .success(TypeReference(module: "Swift", name: "Dictionary"))
+          TypeReference(module: "Swift", name: "Dictionary")
         )
       )
     )
@@ -323,12 +291,12 @@ final class PartialTypeResolutionTests: XCTestCase {
     // Opaque/any types
     assertPartialResolutionResult(
       typeSyntax: "some Proto & Class",
-      result: .success(.composition([.typeSyntax("Proto"), .typeSyntax("Class")]))
+      result: .success(.composition(["Proto", "Class"]))
     )
     assertPartialResolutionResult(
       typeSyntax: "any A",
       result: .success(
-        .typeIdentifier(.success(TypeReference(name: "A")))
+        .typeIdentifier(TypeReference(name: "A"))
       )
     )
 
@@ -336,7 +304,7 @@ final class PartialTypeResolutionTests: XCTestCase {
     assertPartialResolutionResult(
       typeSyntax: "repeat each T",
       result: .success(
-        .typeIdentifier(.success(TypeReference(name: "T")))
+        .typeIdentifier(TypeReference(name: "T"))
       )
     )
 
@@ -345,8 +313,8 @@ final class PartialTypeResolutionTests: XCTestCase {
       typeSyntax: "Module::MyType & Any",
       result: .success(
         .composition([
-          .typeSyntax("Module::MyType"),
-          .typeSyntax("Any"),
+          "Module::MyType",
+          "Any",
         ])
       )
     )
